@@ -5,7 +5,7 @@
 # Tener instalado una distribución de conda, ya sea Anaconda o Miniconda 
 # Crear un entorno con los programas que vamos a utilizar.
 
-conda create -n Pipeline1 -c defaults -c conda-forge -c bioconda fastp multiqc bwa samtools=1.19 qualimap htslib openjdk=17 quast bandage
+conda create -n Pipeline1 -c defaults -c conda-forge -c bioconda fastp multiqc bwa samtools qualimap htslib openjdk=17 quast bandage
 
 # -n nombre del entorno
 # -c se usa para indicar el canal de conda desde donde instalar los paquetes requeridos. Un canal de conda
@@ -35,8 +35,11 @@ conda create -n Pipeline1 -c defaults -c conda-forge -c bioconda fastp multiqc b
 # openjdk=17 es el Java Development Kit de código abierto. Necesario para trabajar con paquetes como ???
 # bandage: para visualizar ensamblados
 
-#MIRAR ACTIVIDAD
 
+
+# TEORIA
+# Lenguaje WDL: Workflow description language es un lenguaje diseñado para definir pipelines de analisis biologicos.
+# Necesita un motor de ejecucion como Cromwell o MiniWDL para ejecurarlo desde bash
 
 
 # 3. Activamos el entorno conda que acabamos de crear
