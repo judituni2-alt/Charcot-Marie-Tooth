@@ -1,0 +1,18 @@
+
+
+# Opciones de paquetes para ensamblado dependiendo de la tecnica
+# Ensambladores recomendados
+#   HiFi reads → Hifiasm (muy usado para genomas humanos completos).
+#   Long reads → Canu, Flye, Shasta.
+#   Los ensambladores híbridos ya son menos necesarios con PacBio HiFi, pero Ma>
+# Pulido y corrección
+#   Pilon → corrige errores residuales usando Illumina.
+#   Racon / Medaka → corrige errores específicos de Nanopore.
+# Evaluación de calidad del ensamblado
+#   QUAST → estadísticas de ensamblaje (N50, contigs, cobertura).
+#   BUSCO → comprueba genes esenciales conservados para evaluar completitud
+# htslib: Es una biblioteca en C que proporciona funciones para trabajar con ar>
+# Es la base de herramientas como Samtools y Bcftools.
+# openjdk=17 es el Java Development Kit de código abierto. Necesario para traba>
+# bandage: para visualizar ensamblados
+
