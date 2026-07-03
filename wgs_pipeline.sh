@@ -6,8 +6,11 @@
 # Secuenciación -> FASTQ -> QC -> Alineamiento -> QC BAM -> Duplicados -> VCF
 #
 # Uso:
-#   ./wgs_pipeline.sh -1 muestra_R1.fastq.gz -2 muestra_R2.fastq.gz -s muestra_id
+#   ./wgs_pipeline.sh -1 CMT1234_R1.fastq.gz -2 CMT1234_R2.fastq.gz -s CMT1234
 #
+#   Ejemplo uso: se cargan losr archivos en el directorio actual y se añade
+#   su ID de modo que. Este ID servira para identificar los archivos que 
+#   correspondan a un mismo paciente.
 # Requiere (instalar con conda/mamba idealmente):
 #   fastqc, fastp, bwa, samtools, bamtools, picard, gatk4
 ###############################################################################
