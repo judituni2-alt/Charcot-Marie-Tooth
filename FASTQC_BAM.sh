@@ -2,6 +2,8 @@
 
 #!/bin/bash
 
+
+# prueba 03_07_2026
 # Tener instalado una distribución de conda, ya sea Anaconda o Miniconda 
 # 1. Crear un entorno con los programas que vamos a utilizar.
 
