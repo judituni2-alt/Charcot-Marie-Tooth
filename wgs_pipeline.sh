@@ -8,14 +8,21 @@
 # Uso:
 #   ./wgs_pipeline.sh -1 CMT1234_R1.fastq.gz -2 CMT1234_R2.fastq.gz -s CMT1234
 #
-#   Ejemplo uso: se cargan losr archivos en el directorio actual y se añade
+#   Ejemplo uso: se cargan los archivos en el directorio actual y se añade
 #   su ID de modo que. Este ID servira para identificar los archivos que 
 #   correspondan a un mismo paciente.
 # Requiere (instalar con conda/mamba idealmente):
 #   fastqc, fastp, bwa, samtools, bamtools, picard, gatk4
 ###############################################################################
 
-set -euo pipefail
+set -euo pipefail 
+# activa 3 procedimientos de seguridad en caso de que el script falle
+#  -e: si cualquier comando del script devuelve un error, el script se detiene inmediatamente
+#  -u: si se usa una variable que no ha sido definida el script falla
+#  -o pipefail: cuando se encadadena con tuberias, si cualquiera de los comandos de la cadena falla, toda la tubería
+#   se considera fallida
+
+
 
 # ---------------------------- 0. CONFIGURACIÓN ------------------------------
 
