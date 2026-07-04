@@ -25,12 +25,26 @@ pip install cyvcf2 pandas --break-system-packages
 
 ## 2. Preparar el genoma de referencia
 
-# Utilizar archivos de genoma de referencia ya indexado extraído de 
-#https://console.cloud.google.com/storage/browser/gcp-public-data--broad-references/hg38/v0;tab=objects?prefix=&forceOnObjectsSortingFiltering=false
-# y disponible en el repositorio (Carpeta hg38)
+Opción 1: Utilizar archivos de genoma de referencia ya indexado extraído de 
+https://console.cloud.google.com/storage/browser/gcp-public-data--broad-references/hg38/v0;tab=objects?prefix=&forceOnObjectsSortingFiltering=false
+Archivos:
+ **Homo_sapiens_assembly38.fasta** --> El genoma de referencia completo en formato FASTA. Archivo base contra el que se alinean las lecturas y se llaman variantes.
+ **Homo_sapiens_assembly38.fasta.fai** --> Índice de samtools. Archivo que guarda, para cada cromosoma, dónde empieza y termina dentro del fasta, y cuántos caracteres tiene cada línea. Permite acceder rápidamente a cualquier posición del genoma sin tener que leer el archivo entero.
+ **Homo_sapiens_assembly38.dict** --> Diccionario de secuencias formato SAM. Contiene lista de los cromosomas del genoma, su longitud y un checksum (MD5) de cada uno. GATK lo usa para verificar que el FASTA, el BAM y los archivos VCF sean todos compatibles entre sí (mismo genoma, mismas coordenadas).
+ **Archivos para indice de alineamiento**
+   - .64.amb: Guarda información sobre las regiones del genoma con bases ambiguas (N), es decir, huecos o zonas no secuenciadas con certeza.
+   - .64.ann: Contiene anotaciones generales del genoma: nombres de los cromosomas, sus longitudes, y dónde empieza cada uno dentro del índice.
+   - .64.bwt: La transformada de Burrows-Wheeler del genoma. Reordenación matemática de toda la secuencia que permite búsquedas de texto extremadamente rápidas.
+   - .64.pac: El genoma comprimido en formato binario (2 bits por base en vez de 1 byte), para ahorrar espacio y acelerar el acceso.
+   - .64.sa:  El "suffix array". Estructura de datos que, combinada con el .bwt, permite encontrar la posición exacta en el genoma de cualquier fragmento de secuencia de forma casi instantánea.
+ **Contigs alternativos**
+   - .64.alt: Lista de las regiones donde existe más de una versión conocida de la secuencia (por ejemplo, la región HLA, muy variable entre personas). Le dice a BWA que esas lecturas pueden alinear en dos sitios distintos legítimamente, evitando que las marque como error o las descarte.
+
+Nota: preferible utilizar los archivos .64
 
 
-# Opción 2: Usar código para indexar otro genoma de referencia
+Opción 2: Usar código para indexar otro genoma de referencia de forma que se generen estos archivos a partir de los 
+archivos .fasta .fai y .dict
 ```bash
 bwa index referencia.fasta
 samtools faidx referencia.fasta

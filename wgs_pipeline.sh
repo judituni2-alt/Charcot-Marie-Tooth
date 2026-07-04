@@ -8,24 +8,32 @@
 # Uso:
 #   ./wgs_pipeline.sh -1 CMT1234_R1.fastq.gz -2 CMT1234_R2.fastq.gz -s CMT1234
 #
-#   Ejemplo uso: se cargan losr archivos en el directorio actual y se añade
+#   Ejemplo uso: se cargan los archivos en el directorio actual y se añade
 #   su ID de modo que. Este ID servira para identificar los archivos que 
 #   correspondan a un mismo paciente.
 # Requiere (instalar con conda/mamba idealmente):
 #   fastqc, fastp, bwa, samtools, bamtools, picard, gatk4
 ###############################################################################
 
-set -euo pipefail
+set -euo pipefail 
+# activa 3 procedimientos de seguridad en caso de que el script falle
+#  -e: si cualquier comando del script devuelve un error, el script se detiene inmediatamente
+#  -u: si se usa una variable que no ha sido definida el script falla
+#  -o pipefail: cuando se encadadena con tuberias, si cualquiera de los comandos de la cadena falla, toda la tubería
+#   se considera fallida
+
+
 
 # ---------------------------- 0. CONFIGURACIÓN ------------------------------
+# Se crean las variables vacías que necesitamos
 
-REF_GENOME=""          # ruta al genoma de referencia (.fasta, ya indexado con bwa index)
+REF_GENOME=""          # ruta al genoma de referencia
 SAMPLE_ID=""
 FASTQ_R1=""
 FASTQ_R2=""
-THREADS=4
-OUTDIR="resultados"
-MAX_TRIM_ROUNDS=2       # nº máximo de intentos de recorte antes de abortar
+THREADS=4              # Son los hilos, es decir, unidades de ejecución paralela. Tiene el valor por defecto 4
+OUTDIR="resultados"    # tiene el valor por defecto "resultados"
+MAX_TRIM_ROUNDS=2      # nº máximo de intentos de recorte antes de abortar
 
 usage() {
     echo "Uso: $0 -r ref.fasta -1 R1.fastq.gz -2 R2.fastq.gz -s sample_id [-t threads] [-o outdir]"
