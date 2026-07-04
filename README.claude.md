@@ -25,6 +25,12 @@ pip install cyvcf2 pandas --break-system-packages
 
 ## 2. Preparar el genoma de referencia
 
+# Utilizar archivos de genoma de referencia ya indexado extraído de 
+#https://console.cloud.google.com/storage/browser/gcp-public-data--broad-references/hg38/v0;tab=objects?prefix=&forceOnObjectsSortingFiltering=false
+# y disponible en el repositorio (Carpeta hg38)
+
+
+# Opción 2: Usar código para indexar otro genoma de referencia
 ```bash
 bwa index referencia.fasta
 samtools faidx referencia.fasta
