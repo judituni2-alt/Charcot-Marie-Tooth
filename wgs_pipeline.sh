@@ -25,14 +25,15 @@ set -euo pipefail
 
 
 # ---------------------------- 0. CONFIGURACIÓN ------------------------------
+# Se crean las variables vacías que necesitamos
 
-REF_GENOME=""          # ruta al genoma de referencia (.fasta, ya indexado con bwa index)
+REF_GENOME=""          # ruta al genoma de referencia
 SAMPLE_ID=""
 FASTQ_R1=""
 FASTQ_R2=""
-THREADS=4
-OUTDIR="resultados"
-MAX_TRIM_ROUNDS=2       # nº máximo de intentos de recorte antes de abortar
+THREADS=4              # Son los hilos, es decir, unidades de ejecución paralela. Tiene el valor por defecto 4
+OUTDIR="resultados"    # tiene el valor por defecto "resultados"
+MAX_TRIM_ROUNDS=2      # nº máximo de intentos de recorte antes de abortar
 
 usage() {
     echo "Uso: $0 -r ref.fasta -1 R1.fastq.gz -2 R2.fastq.gz -s sample_id [-t threads] [-o outdir]"
