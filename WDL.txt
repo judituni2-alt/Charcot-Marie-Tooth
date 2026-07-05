@@ -1,8 +1,0 @@
-
-
-# TEORIA
-# Lenguaje WDL: Workflow description language es un lenguaje diseñado para definir pipelines de analisis biologicos.
-# Necesita un motor de ejecucion como Cromwell o MiniWDL para ejecurarlo desde bash
-
-
-https://github.com/broadinstitute/warp/blob/fbcdc4beca80260b9e13a70eb8e21aa62ef2b598/pipelines/wdl/dna_seq/germline/single_sample/wgs/WholeGenomeGermlineSingleSample.wdl
