@@ -25,16 +25,17 @@ set -euo pipefail
 
 
 # ---------------------------- 0. CONFIGURACIÓN ------------------------------
-# Se crean las variables vacías que necesitamos
+# Se crean las variables vacías que se necesitan
 
 REF_GENOME=""          # ruta al genoma de referencia
 SAMPLE_ID=""
 FASTQ_R1=""
 FASTQ_R2=""
-THREADS=4              # Son los hilos, es decir, unidades de ejecución paralela. Tiene el valor por defecto 4
+THREADS=4              # Son los hilos, es decir, unidades de ejecución paralela. Tiene el valor por defecto 4 (evaluar cuantos poner según el ordenador que vaya a utilizar)
 OUTDIR="resultados"    # tiene el valor por defecto "resultados"
 MAX_TRIM_ROUNDS=2      # nº máximo de intentos de recorte antes de abortar
 
+# se crea la funcion de uso
 usage() {
     echo "Uso: $0 -r ref.fasta -1 R1.fastq.gz -2 R2.fastq.gz -s sample_id [-t threads] [-o outdir]"
     exit 1
@@ -48,14 +49,16 @@ while getopts "r:1:2:s:t:o:h" opt; do
         s) SAMPLE_ID="$OPTARG" ;;
         t) THREADS="$OPTARG" ;;
         o) OUTDIR="$OPTARG" ;;
-        h) usage ;;
-        *) usage ;;
+        h) usage ;;                  # si se detecta -h (help) como flag en el comando inicial, imprime usage
+        *) usage ;;                  # si se detecta una flag no definica *, imprime usage
     esac
 done
 
-[[ -z "$REF_GENOME" || -z "$FASTQ_R1" || -z "$FASTQ_R2" || -z "$SAMPLE_ID" ]] && usage
+[[ -z "$REF_GENOME" || -z "$FASTQ_R1" || -z "$FASTQ_R2" || -z "$SAMPLE_ID" ]] && usage 
+# comprueba que las variables que necesitan valor no estan vacias (-z)
 
-mkdir -p "$OUTDIR"/{qc_raw,trimmed,qc_trimmed,align,qc_align,dedup,variants,logs}
+
+mkdir -p "$OUTDIR"/{qc_raw,trimmed,qc_trimmed,align,qc_align,dedup,variants,logs} # se crea directorio con la variable OUTDIR y los subdirectorios
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$OUTDIR/logs/pipeline.log"; }
 

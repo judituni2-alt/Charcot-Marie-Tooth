@@ -60,8 +60,8 @@ chmod +x wgs_pipeline.sh
     -1 muestra_R1.fastq.gz \
     -2 muestra_R2.fastq.gz \
     -s muestra01 \
-    -t 8 \
-    -o resultados
+    -t 8 \                   #tiene valor por defecto 4
+    -o resultados            #tiene valor por defecto resultados
 ```
 
 Esto genera dentro de `resultados/`:
@@ -105,6 +105,6 @@ El diagrama muestra varias herramientas posibles en cada paso. El script usa las
 - **Alineamiento**: cambia la función `run_alineamiento()` por `bowtie2`, `soap`, o `mosaik` si tu proyecto lo requiere específicamente.
 - **Llamado de variantes**: sustituye el bloque de `gatk HaplotypeCaller` por `freebayes`, `platypus`, o `bcftools mpileup | bcftools call` si tu TFM compara herramientas de variant calling.
 
-## Siguiente paso sugerido
+## Comparacion
 
-Si tu TFM requiere comparar varias herramientas (p. ej. varios alineadores o varios variant callers), lo más limpio es parametrizar esas dos funciones del bash con un flag (`-a bwa|bowtie2` y `-v gatk|freebayes`) para poder correr el mismo pipeline con distintas combinaciones y comparar resultados.
+Para comparar varias herramientas (p. ej. varios alineadores o varios variant callers), --->  parametrizar esas dos funciones del bash con un flag (`-a bwa|bowtie2` y `-v gatk|freebayes`) para poder correr el mismo pipeline con distintas combinaciones y comparar resultados.
