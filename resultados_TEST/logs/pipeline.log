@@ -1,0 +1,4 @@
+[2026-07-05 15:53:26] == Iniciando pipeline para muestra: TEST1 ==
+[2026-07-05 15:53:26] Ejecutando FastQC sobre Test_1.fastq.gz y Test_2.fastq.gz
+[2026-07-05 15:53:48] Sí cumple criterios de calidad -> continuando con alineamiento
+[2026-07-05 15:53:48] Alineando con BWA-MEM contra /home/judit/hg38/hg38_v0_Homo_sapiens_assembly38.fasta

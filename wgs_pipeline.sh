@@ -35,6 +35,38 @@ THREADS=4              # Son los hilos, es decir, unidades de ejecución paralel
 OUTDIR="resultados"    # tiene el valor por defecto "resultados"
 MAX_TRIM_ROUNDS=2      # nº máximo de intentos de recorte antes de abortar
 
+# Módulos de FastQC que se consideran críticos para decidir si hace falta recortar.
+# Todos los  módulos posibles
+#  - Basic Statistics
+#  - Per base sequence quality
+#  - Per sequence quality scores
+#  - Per base sequence content
+#  - Per sequence GC content
+#  - Per base N content
+#  - Sequence Length Distribution
+#  - Sequence Duplication Levels
+#  - Overrepresented sequences
+#  - Adapter Content
+MODULOS_CRITICOS=(
+    "Per base sequence quality"
+    "Per sequence quality scores"
+    "Per sequence GC content"
+    "Adapter Content"
+)
+
+# --- Parámetros de recorte/filtrado de fastp  ---
+# Ajusta estos valores según el criterio de tu pipeline.
+FASTP_QUALIFIED_QUALITY_PHRED=25   # -q  : Phred mínimo para considerar una base "cualificada" (default fastp: 15)
+FASTP_UNQUALIFIED_PERCENT_LIMIT=40 # -u  : % máximo de bases no cualificadas permitido por read (default fastp: 40)
+FASTP_N_BASE_LIMIT=5               # -n  : nº máx. de bases N permitidas por read antes de descartarlo (default fastp: 5)
+FASTP_LENGTH_REQUIRED=15           # -l  : longitud mínima del read tras recortar (default fastp: 15)
+FASTP_CUT_WINDOW_SIZE=4            #     : tamaño de ventana para recorte por calidad deslizante (default fastp: 4)
+FASTP_CUT_MEAN_QUALITY=20          #     : calidad media mínima exigida en cada ventana (default fastp: 20, Q20)
+
+
+
+
+
 # se crea la funcion de uso
 usage() {
     echo "Uso: $0 -r ref.fasta -1 R1.fastq.gz -2 R2.fastq.gz -s sample_id [-t threads] [-o outdir]"
@@ -58,9 +90,13 @@ done
 # comprueba que las variables que necesitan valor no estan vacias (-z)
 
 
-mkdir -p "$OUTDIR"/{qc_raw,trimmed,qc_trimmed,align,qc_align,dedup,variants,logs} # se crea directorio con la variable OUTDIR y los subdirectorios
+mkdir -p "$OUTDIR"/{qc_raw,trimmed,qc_trimmed,align,qc_align,dedup,variants,logs} 
+# se crea directorio con la variable OUTDIR (valor por defecto resultados)  y los subdirectorios
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$OUTDIR/logs/pipeline.log"; }
+# se crea la función log para trackear el proceso que se está ejecutando, el día y la hora
+
+
 
 # ------------------------ 1. CARGA / VARIABLES -------------------------------
 
@@ -70,31 +106,52 @@ R2="$FASTQ_R2"
 
 # ------------------------ 2. ANÁLISIS DE CALIDAD (FastQC) -------------------
 
+# Función para correr el analisis de calidad (fastqc)
+# se definen las variables locales r1 r2 y outdir
 run_fastqc() {
     local r1=$1 r2=$2 outdir=$3
     log "Ejecutando FastQC sobre $r1 y $r2"
-    fastqc -t "$THREADS" -o "$outdir" "$r1" "$r2" &> "$OUTDIR/logs/fastqc_${outdir##*/}.log"
+    fastqc -t "$THREADS" -o "$outdir" "$r1" "$r2" &> "$OUTDIR/logs/fastqc_${outdir##*/}.log" 
 }
 
-# Comprueba si FastQC ha marcado FAIL en algún módulo clave (adaptadores, calidad por base)
+# &> manda los mensajes de progreso a un archivo log
+
+# Se crea funcion qc_pasa_criterios
+# Comprueba si FastQC ha marcado FAIL en alguno de los módulos definidos como críticos
+# en MODULOS_CRITICOS (ver configuración arriba). Módulos no listados ahí no bloquean
+# el pipeline aunque FastQC los marque como FAIL o WARN.
 qc_pasa_criterios() {
     local outdir=$1
     local fail=0
     for zip in "$outdir"/*_fastqc.zip; do
         unzip -p "$zip" "*/summary.txt" > /tmp/summary.txt
-        if grep -qE "^FAIL" /tmp/summary.txt; then
-            fail=1
-        fi
+        for modulo in "${MODULOS_CRITICOS[@]}"; do
+            if grep -qP "^FAIL\t${modulo}\t" /tmp/summary.txt; then
+                log "FastQC FAIL en módulo crítico '$modulo' ($(basename "$zip"))"
+                fail=1
+            fi
+        done
     done
-    return $fail   # 0 = pasa (sin FAIL), 1 = no pasa
+    return $fail   # 0 = pasa (sin FAIL en módulos críticos), 1 = no pasa
 }
+
+
+# en la funcion qc_pasa_criterios
+# se definen las variables locales outdir y fail. fail por defecto es 0 (no falla nada)
+# para todos los archivos que acaben en _fastqc.zip de la ruta definida en outdir, lo descomprime y extrae el summary.txt 
+# con grep comrpueba si exite el patron FAIL seguido del nombre de cada uno de los  modulos criticos en el summary.text (comprueba cada modulo uno a uno)
+# Si existe ejecuta el log  con el mensaje de error y cambia la variable fail a 1
+
 
 # ------------------------ 3. BUCLE QC -> RECORTE (¿Cumple criterios?) --------
 
 round=0
-run_fastqc "$R1" "$R2" "$OUTDIR/qc_raw"
+qc_dir="$OUTDIR/qc_raw
+# definimos la variables qc_dir que es el nombre de la ruta donde tiene que guardar los archivos la funcion run_fastqc
+run_fastqc "$R1" "$R2" "$qc_dir"
+# le damos valores a las variables locales de la funcion run_fastqc
 
-while ! qc_pasa_criterios "$OUTDIR/qc_raw"; do
+while ! qc_pasa_criterios "$qc_dir"; do
     round=$((round+1))
     if [[ $round -gt $MAX_TRIM_ROUNDS ]]; then
         log "ERROR: la calidad sigue sin cumplir criterios tras $MAX_TRIM_ROUNDS recortes. Abortando."
@@ -105,17 +162,37 @@ while ! qc_pasa_criterios "$OUTDIR/qc_raw"; do
           -o "$OUTDIR/trimmed/${SAMPLE_ID}_R1.trim.fastq.gz" \
           -O "$OUTDIR/trimmed/${SAMPLE_ID}_R2.trim.fastq.gz" \
           --thread "$THREADS" \
+          --qualified_quality_phred "$FASTP_QUALIFIED_QUALITY_PHRED" \
+          --unqualified_percent_limit "$FASTP_UNQUALIFIED_PERCENT_LIMIT" \
+          --n_base_limit "$FASTP_N_BASE_LIMIT" \
+          --length_required "$FASTP_LENGTH_REQUIRED" \
+          --cut_front \
+          --cut_tail \
+          --cut_window_size "$FASTP_CUT_WINDOW_SIZE" \
+          --cut_mean_quality "$FASTP_CUT_MEAN_QUALITY" \
+          --detect_adapter_for_pe \
+          --trim_poly_g \
           --json "$OUTDIR/trimmed/${SAMPLE_ID}_fastp.json" \
           --html "$OUTDIR/trimmed/${SAMPLE_ID}_fastp.html" \
           &> "$OUTDIR/logs/fastp_round${round}.log"
 
+
     R1="$OUTDIR/trimmed/${SAMPLE_ID}_R1.trim.fastq.gz"
     R2="$OUTDIR/trimmed/${SAMPLE_ID}_R2.trim.fastq.gz"
 
-    rm -rf "$OUTDIR/qc_raw"/*
-    run_fastqc "$R1" "$R2" "$OUTDIR/qc_raw"
+    # A partir de la primera ronda de recorte, el QC se evalúa en qc_trimmed,
+    # dejando qc_raw intacto con el QC de los datos originales sin tocar.
+    qc_dir="$OUTDIR/qc_trimmed"
+    rm -rf "$qc_dir"/*
+    run_fastqc "$R1" "$R2" "$qc_dir"
 done
 log "Sí cumple criterios de calidad -> continuando con alineamiento"
+
+# Bucle while: mientras los datos no cumplan los criterios de calidad, 
+# sigue recortando con fastp y volviendo a comprobar, hasta un máximo de intentos.
+
+
+
 
 # ------------------------ 4. ALINEAMIENTO (BWA) ------------------------------
 # Nota: el diagrama contempla BWA / SOAP / Bowtie / MOSAIK. Se usa BWA-MEM
