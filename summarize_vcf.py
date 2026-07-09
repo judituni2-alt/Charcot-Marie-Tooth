@@ -8,8 +8,7 @@ Genera un resumen tabular (CSV) del VCF final del pipeline:
  - distribución de calidad (QUAL)
  - variantes por cromosoma
 
-Requiere: cyvcf2 (pip install cyvcf2 --break-system-packages), pandas
-
+Requiere: cyvcf2 (pip install cyvcf2 
 Uso:
     python summarize_vcf.py resultados/variants/muestra.g.vcf.gz resumen_muestra.csv
 """
@@ -17,7 +16,7 @@ Uso:
 import sys
 import pandas as pd
 from cyvcf2 import VCF
-
+print(sys.executable)
 
 def summarize(vcf_path: str, out_csv: str) -> None:
     vcf = VCF(vcf_path)
@@ -55,8 +54,7 @@ def summarize(vcf_path: str, out_csv: str) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Uso: python summarize_vcf.py <archivo.vcf.gz> <salida.csv>")
-        sys.exit(1)
-
-    summarize(sys.argv[1], sys.argv[2])
+    summarize(
+        "/home/judit/TFM/Charcot-Marie-Tooth/resultados/variants/TEST2.g.vcf.gz",
+        "/home/judit/TFM/Charcot-Marie-Tooth/resultados/variants/variantes.csv"
+    )

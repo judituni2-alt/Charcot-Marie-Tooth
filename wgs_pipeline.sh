@@ -15,7 +15,7 @@
 #   fastqc, fastp, bwa, samtools, bamtools, picard, gatk4
 ###############################################################################
 
-set -euo pipefail 
+set -euo pipefail
 # activa 3 procedimientos de seguridad en caso de que el script falle
 #  -e: si cualquier comando del script devuelve un error, el script se detiene inmediatamente
 #  -u: si se usa una variable que no ha sido definida el script falla
@@ -50,7 +50,6 @@ MAX_TRIM_ROUNDS=2      # nº máximo de intentos de recorte antes de abortar
 MODULOS_CRITICOS=(
     "Per base sequence quality"
     "Per sequence quality scores"
-    "Per sequence GC content"
     "Adapter Content"
 )
 
@@ -146,10 +145,14 @@ qc_pasa_criterios() {
 # ------------------------ 3. BUCLE QC -> RECORTE (¿Cumple criterios?) --------
 
 round=0
-qc_dir="$OUTDIR/qc_raw
+qc_dir="$OUTDIR/qc_raw"
 # definimos la variables qc_dir que es el nombre de la ruta donde tiene que guardar los archivos la funcion run_fastqc
 run_fastqc "$R1" "$R2" "$qc_dir"
 # le damos valores a las variables locales de la funcion run_fastqc
+
+
+# FASTP: es una herramienta utilizada concretamente para short reads (Illumina, Sanger)
+
 
 while ! qc_pasa_criterios "$qc_dir"; do
     round=$((round+1))
@@ -250,11 +253,9 @@ picard MarkDuplicates \
 samtools index "$BAM_DEDUP"
 
 # ------------------------ 7. LLAMADO DE VARIANTES (GATK HaplotypeCaller) ----
-# Nota: el diagrama contempla GATK HaplotypeCaller / FreeBayes / Platypus /
-# Samtools-BCFtools. Se usa GATK por ser el estándar para línea germinal.
+
 
 VCF_OUT="$OUTDIR/variants/${SAMPLE_ID}.g.vcf.gz"
-
 log "Llamando variantes germinales con GATK HaplotypeCaller"
 gatk HaplotypeCaller \
     -R "$REF_GENOME" \
