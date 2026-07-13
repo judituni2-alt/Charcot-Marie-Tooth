@@ -33,7 +33,7 @@ FASTQ_R1=""
 FASTQ_R2=""
 THREADS=4              # Son los hilos, es decir, unidades de ejecución paralela. Tiene el valor por defecto 4 (evaluar cuantos poner según el ordenador que vaya a utilizar)
 OUTDIR="resultados"    # tiene el valor por defecto "resultados"
-MAX_TRIM_ROUNDS=2      # nº máximo de intentos de recorte antes de abortar
+MAX_TRIM_ROUNDS=1      # nº máximo de intentos de recorte antes de abortar
 
 # Módulos de FastQC que se consideran críticos para decidir si hace falta recortar.
 # Todos los  módulos posibles
@@ -113,7 +113,7 @@ run_fastqc() {
     fastqc -t "$THREADS" -o "$outdir" "$r1" "$r2" &> "$OUTDIR/logs/fastqc_${outdir##*/}.log" 
 }
 
-# &> manda los mensajes de progreso a un archivo log
+# &> manda los mensajes de progreso a un archivo en la carpeta logs
 
 # Se crea funcion qc_pasa_criterios
 # Comprueba si FastQC ha marcado FAIL en alguno de los módulos definidos como críticos
@@ -165,16 +165,11 @@ while ! qc_pasa_criterios "$qc_dir"; do
           -o "$OUTDIR/trimmed/${SAMPLE_ID}_R1.trim.fastq.gz" \
           -O "$OUTDIR/trimmed/${SAMPLE_ID}_R2.trim.fastq.gz" \
           --thread "$THREADS" \
-          --qualified_quality_phred "$FASTP_QUALIFIED_QUALITY_PHRED" \
-          --unqualified_percent_limit "$FASTP_UNQUALIFIED_PERCENT_LIMIT" \
-          --n_base_limit "$FASTP_N_BASE_LIMIT" \
-          --length_required "$FASTP_LENGTH_REQUIRED" \
           --cut_front \
           --cut_tail \
           --cut_window_size "$FASTP_CUT_WINDOW_SIZE" \
           --cut_mean_quality "$FASTP_CUT_MEAN_QUALITY" \
           --detect_adapter_for_pe \
-          --trim_poly_g \
           --json "$OUTDIR/trimmed/${SAMPLE_ID}_fastp.json" \
           --html "$OUTDIR/trimmed/${SAMPLE_ID}_fastp.html" \
           &> "$OUTDIR/logs/fastp_round${round}.log"
