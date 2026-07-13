@@ -4,3 +4,29 @@ Test*
 resultados/
 Antiguo/
 hg38_*
+
+
+# Referencias
+*.fa
+*.fasta
+*.fai
+*.dict
+*.gtf
+*.gtf.gz
+*.gff
+*.gff3
+
+# Índices BWA
+*.amb
+*.ann
+*.bwt
+*.pac
+*.sa
+*.alt
+
+# Alineamientos
+*.bam
+*.bai
+
+# Resultados
+resultados/
