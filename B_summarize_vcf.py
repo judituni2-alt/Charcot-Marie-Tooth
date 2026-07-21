@@ -18,7 +18,7 @@ import pandas as pd
 from cyvcf2 import VCF
 print(sys.executable)
 
-def summarize(vcf_path: str) -> None:
+def summarize(vcf_path: str, out_csv: str) -> None:
     vcf = VCF(vcf_path)
 
     rows = []
@@ -49,7 +49,12 @@ def summarize(vcf_path: str) -> None:
     print(resumen_chrom.head(10).to_string())
     print(f"\nQUAL medio: {df['qual'].mean():.2f}  |  QUAL mediana: {df['qual'].median():.2f}")
 
+    df.to_csv(out_csv, index=False)
+    print(f"\nDetalle completo guardado en: {out_csv}")
+
 
 if __name__ == "__main__":
     summarize(
-        "/mnt/d/resultados_NeurMUS1409/variants/NeurMUS_1409.vcf.gz")
+        "/home/judit/TFM/Charcot-Marie-Tooth/resultados/variants/TEST2.g.vcf.gz",
+        "/home/judit/TFM/Charcot-Marie-Tooth/resultados/variants/variantes.csv"
+    )
