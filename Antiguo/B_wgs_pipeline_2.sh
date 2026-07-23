@@ -6,17 +6,14 @@
 # Secuenciación -> Fusión FASTQ -> QC -> Alineamiento -> QC BAM -> Duplicados -> VCF
 #
 # Los archivos FASTQ de entrada se leen desde un disco duro/unidad externa
-# (flag -d), y todos los archivos y carpetas que genera el pipeline se
-# guardan también en ese mismo disco (no en el disco de la máquina virtual,
-# que suele tener poco espacio y no es apto para datos de WGS).
+# y todos los archivos y carpetas que genera el pipeline se
+# guardan también en ese mismo disco.
 #
 # Uso:
-#   ./wgs_pipeline.sh -d /media/usuario/discoduro \
+#   ./B_wgs_pipeline.sh
 #       -1 CMT1234_R1.fastq.gz -2 CMT1234_R2.fastq.gz -s CMT1234 -r ref.fasta
 #
-#   Si -1/-2 se dan como rutas relativas (sin "/" inicial), se interpretan
-#   relativas a -d (el disco). Si se dan como rutas absolutas, se usan tal
-#   cual, pero el pipeline avisa si no están dentro de -d.
+#
 #
 #   Si la muestra viene repartida en varios archivos por carril de
 #   secuenciación (lane splitting, típico de Illumina: L001, L002, L003...),
@@ -24,42 +21,41 @@
 #   pipeline los fusiona automáticamente en un único R1 y un único R2 antes
 #   de continuar:
 #
-#   ./wgs_pipeline.sh -d /media/usuario/discoduro \
+#   ./B_wgs_pipeline.sh
 #       -1 CMT1234_L001_R1.fastq.gz,CMT1234_L002_R1.fastq.gz \
 #       -2 CMT1234_L001_R2.fastq.gz,CMT1234_L002_R2.fastq.gz \
 #       -s CMT1234 -r ref.fasta
+#       -o resultados
 #
 #   Para que el pipeline siga ejecutándose aunque se cierre la terminal
 #   (por ejemplo, en una conexión SSH que se pueda cortar), añadir -b:
 #
-#   ./wgs_pipeline.sh -d /media/usuario/discoduro -1 ... -2 ... -s CMT1234 -r ref.fasta -b
+#   ./B_wgs_pipeline.sh -1 ... -2 ... -s CMT1234 -r ref.fasta -b
 #
-# Requiere (instalar con conda/mamba idealmente):
-#   fastqc, fastp, bwa, samtools, bamtools, picard, bcftools, tabix
+# Requiere instalar: fastqc, fastp, bwa, samtools, bamtools, picard, bcftools, tabix
+# Para ello crear un ambiente de conda/mamba con los recursos necesarios
 ###############################################################################
 
 set -euo pipefail
 # activa 3 procedimientos de seguridad en caso de que el script falle
-#  -e: si cualquier comando del script devuelve un error, el script se detiene inmediatamente
-#  -u: si se usa una variable que no ha sido definida el script falla
+#  -e: si cualquier comando del script devuelve un error (exit status distinto de 0) el script se detiene inmediatamente
+#  -u: si se usa una variable que no ha sido definida previamente el script falla
 #  -o pipefail: cuando se encadadena con tuberias, si cualquiera de los comandos de la cadena falla, toda la tubería
 #   se considera fallida
-
+# https://linuxize.com/post/bash-best-practices/  --> Investigar mas buenas practica
 
 
 # ---------------------------- 0. CONFIGURACIÓN ------------------------------
 # Se crean las variables vacías que se necesitan
 
-DISK_DIR=""            # ruta base del disco duro/unidad externa (obligatorio)
 REF_GENOME=""          # ruta al genoma de referencia
-SAMPLE_ID=""
+SAMPLE_ID=""           # ID de la muestra
 FASTQ_R1=""            # uno o varios archivos separados por coma (lanes)
 FASTQ_R2=""            # uno o varios archivos separados por coma (lanes)
-THREADS=8              # Son los hilos, es decir, unidades de ejecución paralela. Valor por defecto: 8 (evaluar cuantos poner según el ordenador que vaya a utilizar)
-OUTDIR=""              # se resuelve más abajo, DESPUÉS de parsear -s y -d
+THREADS=8              # Son los hilos, es decir, unidades de ejecución paralela. Valor por defecto: 8
+OUTDIR=""              # se resuelve más abajo, DESPUÉS de parsear -s
 MAX_TRIM_ROUNDS=1      # nº máximo de intentos de recorte antes de abortar
 BACKGROUND=false       # si se activa con -b, el pipeline se relanza en segundo plano
-MIN_ESPACIO_LIBRE_GB=100   # aviso (no bloqueante) si el disco tiene menos espacio libre que esto
 
 # Módulos de FastQC que se consideran críticos para decidir si hace falta recortar.
 # Todos los  módulos posibles
@@ -77,6 +73,7 @@ MODULOS_CRITICOS=(
     "Per base sequence quality"
     "Per sequence quality scores"
     "Adapter Content"
+    "Overrepresented sequences"
 )
 
 # --- Parámetros de recorte/filtrado de fastp  ---
@@ -91,11 +88,8 @@ FASTP_CUT_MEAN_QUALITY=20          #     : calidad media mínima exigida en cada
 # se crea la funcion de uso
 usage() {
     cat <<EOF
-Uso: $0 -d disco_dir -r ref.fasta -1 R1.fastq.gz -2 R2.fastq.gz -s sample_id [-t threads] [-o outdir] [-b]
+Uso: $0  -r ref.fasta -1 R1.fastq.gz -2 R2.fastq.gz -s sample_id [-t threads] [-o outdir] [-b]
 
-  -d DIR    Directorio base del disco duro/unidad externa. Los FASTQ (si se
-            dan como ruta relativa) se leen desde aquí, y todos los
-            resultados se guardan aquí (obligatorio).
   -1 / -2   Admiten varios archivos separados por coma (sin espacios) si la
             muestra está repartida en varios carriles/lanes, ej:
             -1 L001_R1.fastq.gz,L002_R1.fastq.gz
@@ -105,9 +99,8 @@ EOF
     exit 1
 }
 
-while getopts "d:r:1:2:s:t:o:bh" opt; do
+while getopts "r:1:2:s:t:o:bh" opt; do
     case $opt in
-        d) DISK_DIR="$OPTARG" ;;
         r) REF_GENOME="$OPTARG" ;;
         1) FASTQ_R1="$OPTARG" ;;
         2) FASTQ_R2="$OPTARG" ;;
@@ -120,84 +113,23 @@ while getopts "d:r:1:2:s:t:o:bh" opt; do
     esac
 done
 
-[[ -z "$DISK_DIR" || -z "$REF_GENOME" || -z "$FASTQ_R1" || -z "$FASTQ_R2" || -z "$SAMPLE_ID" ]] && usage
-# comprueba que las variables que necesitan valor no estan vacias (-z)
-
-
-# --------------- 0.a VALIDACIÓN DEL DISCO EXTERNO ---------------------------
-if [[ ! -d "$DISK_DIR" ]]; then
-    echo "ERROR: el directorio de disco indicado (-d) no existe: $DISK_DIR" >&2
-    exit 1
-fi
-if [[ ! -w "$DISK_DIR" ]]; then
-    echo "ERROR: el directorio de disco indicado (-d) no tiene permiso de escritura: $DISK_DIR" >&2
-    exit 1
-fi
-# Ruta absoluta y canónica del disco, para comparaciones y logs fiables.
-DISK_DIR="$(realpath "$DISK_DIR")"
-
-# Aviso (no bloqueante) de espacio libre insuficiente. WGS genera archivos
-# muy grandes (BAM, dedup BAM, FASTQ intermedios); un disco casi lleno es
-# una causa muy común de fallos a mitad de pipeline, difíciles de depurar.
-ESPACIO_LIBRE_GB=$(df --output=avail -BG "$DISK_DIR" | tail -1 | tr -dc '0-9')
-if [[ "$ESPACIO_LIBRE_GB" -lt "$MIN_ESPACIO_LIBRE_GB" ]]; then
-    echo "AVISO: solo quedan ${ESPACIO_LIBRE_GB}GB libres en $DISK_DIR (recomendado: >= ${MIN_ESPACIO_LIBRE_GB}GB para WGS)" >&2
-fi
-
-# --------------- 0.b RESOLUCIÓN DE RUTAS FASTQ SOBRE EL DISCO ---------------
-# Si -1/-2 vienen como rutas relativas, se anclan al disco (-d). Si vienen
-# como rutas absolutas, se respetan, pero se avisa si caen fuera del disco
-# (para dejar constancia en el log de que la lectura no es 100% desde -d).
-resolver_rutas_fastq() {
-    local input_list="$1"
-    local -a files resueltas
-    IFS=',' read -ra files <<< "$input_list"
-    for f in "${files[@]}"; do
-        f="$(echo "$f" | xargs)"   # recorta espacios accidentales alrededor de cada coma
-        if [[ "$f" == /* ]]; then
-            ruta="$f"
-            [[ "$ruta" != "$DISK_DIR"/* ]] && \
-                echo "AVISO: $ruta es una ruta absoluta fuera de $DISK_DIR" >&2
-        else
-            ruta="$DISK_DIR/$f"
-        fi
-        resueltas+=("$ruta")
-    done
-    ( IFS=','; echo "${resueltas[*]}" )
-}
-
-FASTQ_R1="$(resolver_rutas_fastq "$FASTQ_R1")"
-FASTQ_R2="$(resolver_rutas_fastq "$FASTQ_R2")"
-
-# OUTDIR se resuelve AQUÍ (no en la configuración inicial), porque depende
-# de $SAMPLE_ID y de $DISK_DIR, que solo se conocen tras parsear los flags.
-# Por defecto, los resultados se guardan DENTRO del disco externo. Si el
-# usuario indica -o con una ruta relativa, también se ancla al disco; si
-# indica una ruta absoluta fuera del disco, se respeta pero se avisa.
-if [[ -z "$OUTDIR" ]]; then
-    OUTDIR="$DISK_DIR/resultados_${SAMPLE_ID}"
-elif [[ "$OUTDIR" != /* ]]; then
-    OUTDIR="$DISK_DIR/$OUTDIR"
-elif [[ "$OUTDIR" != "$DISK_DIR"/* ]]; then
-    echo "AVISO: -o es una ruta absoluta fuera de $DISK_DIR; los resultados no quedarán en el disco externo" >&2
-fi
+[[ -z "$REF_GENOME" || -z "$FASTQ_R1" || -z "$FASTQ_R2" || -z "$SAMPLE_ID" ]] && usage
+# comprueba si las variables REF_GENOME o FASTQ_R1 o FASTQ_R2 o SAMPLE_ID estan vacias (-z es TRUE) y si lo están ejecuta usage
 
 mkdir -p "$OUTDIR"/{merged,qc_raw,trimmed,qc_trimmed,align,qc_align,dedup,variants,logs} 
 # se crea directorio con la variable OUTDIR (dentro del disco externo) y los subdirectorios
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$OUTDIR/logs/pipeline.log"; }
-# se crea la función log para trackear el proceso que se está ejecutando, el día y la hora
+# se crea la función log para registrar las salidas del pipeline, el día y la hora
 
-log "Disco de trabajo: $DISK_DIR (espacio libre: ${ESPACIO_LIBRE_GB}GB)"
 log "FASTQ R1 resueltos: $FASTQ_R1"
 log "FASTQ R2 resueltos: $FASTQ_R2"
 log "Carpeta de resultados: $OUTDIR"
 
 
 # --------------- 0.c VALIDACIÓN TEMPRANA DE ENTRADAS -------------------------
-# Comprobar cuanto antes que todo lo necesario existe, para no descubrir un
-# archivo que falta después de haber gastado tiempo en FastQC/fastp (pasos
-# largos que precederían al fallo si no se valida aquí).
+# Comprobar que el archivo de genoma de referencia y los archivos asocidados necesarios para el alineamiento
+# esten disponibles -f
 if [[ ! -f "$REF_GENOME" ]]; then
     log "ERROR: no se encuentra el genoma de referencia: $REF_GENOME"
     exit 1
@@ -242,7 +174,7 @@ if $BACKGROUND && [[ "${WGS_PIPELINE_BG:-0}" != "1" ]]; then
     log "Flag -b activado: relanzando el pipeline en segundo plano con nohup"
     log "Puedes cerrar la terminal sin problema. Progreso en: $BG_LOG"
     WGS_PIPELINE_BG=1 nohup "$SCRIPT_PATH" \
-        -d "$DISK_DIR" -r "$REF_GENOME" -1 "$FASTQ_R1" -2 "$FASTQ_R2" -s "$SAMPLE_ID" \
+         -r "$REF_GENOME" -1 "$FASTQ_R1" -2 "$FASTQ_R2" -s "$SAMPLE_ID" \
         -t "$THREADS" -o "$OUTDIR" \
         > "$BG_LOG" 2>&1 < /dev/null &
     disown
@@ -265,25 +197,24 @@ log "== Iniciando pipeline para muestra: $SAMPLE_ID =="
 # "multi-miembro" que cualquier herramienta (fastqc, fastp, bwa) lee sin
 # problema, exactamente igual que si fuera un único archivo.
 #
-# Si solo se pasa un archivo (sin comas), no se copia todo el contenido
-# (evita duplicar espacio en disco para WGS, que son archivos grandes):
-# simplemente se crea un enlace simbólico al archivo original.
+
 merge_fastqs() {
-    local input_list="$1" output_file="$2"
+    local input_list="$1"
+    local output_file="$2"
+
     IFS=',' read -ra files <<< "$input_list"
 
-    for f in "${files[@]}"; do
-        [[ -f "$f" ]] || { log "ERROR: archivo FASTQ no encontrado: $f"; exit 1; }
-    done
-
     if [[ ${#files[@]} -eq 1 ]]; then
-        log "  $(basename "$output_file"): un solo archivo de entrada, enlazando sin copiar"
-        ln -sf "$(realpath "${files[0]}")" "$output_file"
+        log "  $(basename "${files[0]}"): un único FASTQ, no se fusiona"
+        echo "${files[0]}"
     else
         log "  $(basename "$output_file"): fusionando ${#files[@]} archivos (lanes)"
         cat "${files[@]}" > "$output_file"
+        echo "$output_file"
     fi
 }
+
+
 
 R1_MERGED="$OUTDIR/merged/${SAMPLE_ID}_R1.merged.fastq.gz"
 R2_MERGED="$OUTDIR/merged/${SAMPLE_ID}_R2.merged.fastq.gz"

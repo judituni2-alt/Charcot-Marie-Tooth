@@ -1,50 +1,35 @@
 #!/usr/bin/env bash
 ################################################################################
-# wgs_pipeline.sh
+# B_wgs_pipeline_4.sh
 #
 # Pipeline de análisis de Secuenciación de Genoma Completo (WGS) - línea germinal
 # Secuenciación -> Fusión FASTQ -> QC -> Alineamiento -> QC BAM -> Duplicados -> VCF
 #
-# Los archivos FASTQ de entrada se leen desde un disco duro/unidad externa
-# y todos los archivos y carpetas que genera el pipeline se
-# guardan también en ese mismo disco.
 #
 # Uso:
-#   ./B_wgs_pipeline.sh
-#       -1 CMT1234_R1.fastq.gz -2 CMT1234_R2.fastq.gz -s CMT1234 -r ref.fasta
-#
-#
+#   ./B_wgs_pipeline_4.sh
+#       -1 CMT1234_R1.fastq.gz -2 CMT1234_R2.fastq.gz -s CMT1234 -r ref.fasta -o resultados_CMT1234
 #
 #   Si la muestra viene repartida en varios archivos por carril de
-#   secuenciación (lane splitting, típico de Illumina: L001, L002, L003...),
-#   se pueden indicar varios archivos separados por coma en -1 y -2, y el
-#   pipeline los fusiona automáticamente en un único R1 y un único R2 antes
-#   de continuar:
+#   secuenciación (lane splitting, L001, L002, L003...),se pueden indicar varios archivos
+#   separados por coma en -1 y -2, y el pipeline los fusiona automáticamente en un único R1 y un único R2
+#   antes de continuar:
 #
-#   ./B_wgs_pipeline.sh
+#   ./B_wgs_pipeline_4.sh
 #       -1 CMT1234_L001_R1.fastq.gz,CMT1234_L002_R1.fastq.gz \
 #       -2 CMT1234_L001_R2.fastq.gz,CMT1234_L002_R2.fastq.gz \
 #       -s CMT1234 -r ref.fasta
-#       -o resultados
+#       -o resultados_CMT1234
 #
-#   Para que el pipeline siga ejecutándose aunque se cierre la terminal
-#   (por ejemplo, en una conexión SSH que se pueda cortar), añadir -b:
+#   Es importante que los lanes esten en el mismo orden en -1 respecto a -2
 #
-#   ./B_wgs_pipeline.sh -1 ... -2 ... -s CMT1234 -r ref.fasta -b
+#
+#
+#   ./B_wgs_pipeline_4.sh -1 ... -2 ... -s CMT1234 -r ref.fasta  -o resultados_CMT1234
 #
 # Requiere instalar: fastqc, fastp, bwa, samtools, bamtools, picard, bcftools, tabix
 # Para ello crear un ambiente de conda/mamba con los recursos necesarios
 #
-# NOTA SOBRE VELOCIDAD DE FASTQC:
-# FastQC paraleliza por ARCHIVO (cada archivo lo procesa un único hilo), no
-# por contenido interno del archivo, así que con solo R1+R2 nunca aprovecha
-# más de 2 hilos por mucho -t que se indique, y leer/descomprimir el FASTQ
-# completo es lo que más tiempo tarda. Por eso, antes de cada llamada a
-# FastQC, se submuestrean SUBSAMPLE_READS reads por archivo (R1 y R2 en
-# paralelo): unos pocos millones de lecturas ya dan métricas de calidad
-# estadísticamente representativas y se evita leer el FASTQ entero.
-# Para desactivar el submuestreo y analizar el archivo completo, poner
-# SUBSAMPLE_READS=0.
 ###############################################################################
 
 set -euo pipefail
@@ -57,17 +42,24 @@ set -euo pipefail
 
 
 # ---------------------------- 0. CONFIGURACIÓN ------------------------------
-# Se crean las variables vacías que se necesitan
+
+# ---------------------------- Creación de variables --------------------------
 
 REF_GENOME=""          # ruta al genoma de referencia
 SAMPLE_ID=""           # ID de la muestra
 FASTQ_R1=""            # uno o varios archivos separados por coma (lanes)
 FASTQ_R2=""            # uno o varios archivos separados por coma (lanes)
+OUTDIR=""              # directorio en el que se guardan los resultados
 THREADS=8              # Son los hilos, es decir, unidades de ejecución paralela. Valor por defecto: 8
-OUTDIR=""              # se resuelve más abajo, DESPUÉS de parsear -s
 MAX_TRIM_ROUNDS=1      # nº máximo de intentos de recorte antes de abortar
-BACKGROUND=false       # si se activa con -b, el pipeline se relanza en segundo plano
 SUBSAMPLE_READS=2000000  # nº de reads a submuestrear por archivo antes de FastQC (0 = desactivado, usa el archivo completo)
+
+# Nota de variable "SUBSAMPLE_READS": Para acelear la ejecución del pipeline solo se analiza la calidad de una muestra representativa
+# Normalmente los FastQ obtenidos de secuenciación en empresas comerciales externas (como es el caso)
+# tienen estándares de calidad y aportan sus propios FastQC report por lo que resulta sencillo comprobar la
+# calidad de la secuenciación previamente a ejecutar el pipeline.
+# Se ha incluido este paso en el pipeline por ser un paso crucial y para mayor personalización
+# y automatización del proceso.
 
 # Módulos de FastQC que se consideran críticos para decidir si hace falta recortar.
 # Todos los  módulos posibles
@@ -96,61 +88,70 @@ FASTP_CUT_MEAN_QUALITY=20          #     : calidad media mínima exigida en cada
 
 
 
+# ---------------------------- Crear función de uso ------------------------------
 
-# se crea la funcion de uso
 usage() {
     cat <<EOF
-Uso: $0  -r ref.fasta -1 R1.fastq.gz -2 R2.fastq.gz -s sample_id [-t threads] [-o outdir] [-b] [-q subsample_reads]
-
-  -1 / -2   Admiten varios archivos separados por coma (sin espacios) si la
+Uso: $0  -r ref.fasta -1 R1.fastq.gz -2 R2.fastq.gz -s sample_id -o outdir [-t threads] [-b] [-q subsample_reads]
+  -r        Obligatorio. Genoma de referencia en formato FASTA.
+  -1 / -2   Obligatorio. Admiten varios archivos separados por coma (sin espacios) si la
             muestra está repartida en varios carriles/lanes, ej:
             -1 L001_R1.fastq.gz,L002_R1.fastq.gz
-  -b        Ejecuta el pipeline en segundo plano (nohup); puedes cerrar la
-            terminal sin que el proceso se interrumpa.
+  -s        Obligatorio. Identificador de la muestra
+  -o        Obligatorio. Nombre del directorio donde se almacenan resultados.
+  -t        Opcional. Hilos de procesador que se quieren utilizar en las herramientas que lo permitan. Por defecto 8
   -q        Nº de reads a submuestrear por archivo antes de FastQC
             (por defecto 2000000). Usar -q 0 para analizar el FASTQ completo.
 EOF
-    exit 1
+    exit 1   # si se invoca directa o indirectamente función de uso el script no sigue corriendo. 
 }
 
-while getopts "r:1:2:s:t:o:q:bh" opt; do
+# -------------------------- Asignación de valores a variables mediante flags ------------------------------
+
+while getopts "r:1:2:s:t:o:q:h" opt; do
     case $opt in
         r) REF_GENOME="$OPTARG" ;;
         1) FASTQ_R1="$OPTARG" ;;
         2) FASTQ_R2="$OPTARG" ;;
         s) SAMPLE_ID="$OPTARG" ;;
-        t) THREADS="$OPTARG" ;;
         o) OUTDIR="$OPTARG" ;;
+        t) THREADS="$OPTARG" ;;
         q) SUBSAMPLE_READS="$OPTARG" ;;
-        b) BACKGROUND=true ;;
         h) usage ;;                  # si se detecta -h (help) como flag en el comando inicial, imprime usage
-        *) usage ;;                  # si se detecta una flag no definica *, imprime usage
+        *) usage ;;                  # si se detecta una flag no definido *, imprime usage
     esac
 done
 
-[[ -z "$REF_GENOME" || -z "$FASTQ_R1" || -z "$FASTQ_R2" || -z "$SAMPLE_ID" ]] && usage
-# comprueba si las variables REF_GENOME o FASTQ_R1 o FASTQ_R2 o SAMPLE_ID estan vacias (-z es TRUE) y si lo están ejecuta usage
+# ---------------------- Comprobación de que las variables obligatorias están definidas ------------------------
 
+[[ -z "$REF_GENOME" || -z "$FASTQ_R1" || -z "$FASTQ_R2" || -z "$SAMPLE_ID" || -z "$OUTDIR" ]] && usage
+# comprueba si las variables REF_GENOME o FASTQ_R1 o FASTQ_R2 o SAMPLE_ID o OUTDIR estan vacias (-z, zero length es TRUE)
+# Si lo están ejecuta usage y se para el pipeline
+
+
+# -------------------- Crear directorio y subsirectorios específicos para la muestra ------------------------------
 mkdir -p "$OUTDIR"/{merged,qc_raw,trimmed,qc_trimmed,align,qc_align,dedup,variants,logs,tmp_picard}
 # se crea directorio con la variable OUTDIR (dentro del disco externo) y los subdirectorios
 # tmp_picard: carpeta de archivos intermedios para Picard MarkDuplicates. Por defecto
-# Picard/Java usan el /tmp del sistema (normalmente en el disco interno, con poco
-# espacio libre) para los ficheros temporales de ordenación; con BAMs de WGS grandes
-# esto puede llenar /tmp y provocar errores de "No space left on device" aunque el
-# disco externo de resultados tenga espacio de sobra. Al indicarle TMP_DIR más abajo,
-# Picard usa esta carpeta del disco externo en su lugar.
+# Picard/Java usan el /tmp del sistema para los ficheros temporales de ordenación; con el uso de BAMs de WGS grandes
+# esto puede llenar /tmp y provocar errores de "No space left on device".
+# Este pipeline tiene configurado por defecto que los archivos temporales generados por Picard MarkDuplicates se
+# guarden en este directorio.
 
+# ---------------------------- Creación de la función log ------------------------------
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$OUTDIR/logs/pipeline.log"; }
 # se crea la función log para registrar las salidas del pipeline, el día y la hora
 
-log "FASTQ R1 resueltos: $FASTQ_R1"
-log "FASTQ R2 resueltos: $FASTQ_R2"
+# ----------------- Primeros logs, resultados de los chequeos hasta ahora ----------------------------
+log "Variables obligatorias definidas"
+log "FASTQ R1: $FASTQ_R1"
+log "FASTQ R2: $FASTQ_R2"
 log "Carpeta de resultados: $OUTDIR"
 
 
-# --------------- 0.c VALIDACIÓN TEMPRANA DE ENTRADAS -------------------------
+# ------------------------ Validación de entradas  -------------------------
 # Comprobar que el archivo de genoma de referencia y los archivos asocidados necesarios para el alineamiento
-# esten disponibles -f
+# sean efectivamente archivos -f (file)
 if [[ ! -f "$REF_GENOME" ]]; then
     log "ERROR: no se encuentra el genoma de referencia: $REF_GENOME"
     exit 1
@@ -166,6 +167,7 @@ for ext in amb ann bwt pac sa; do
     fi
 done
 
+# Comprobar que existen cada uno de los archivos separados por comas en las variables FASTQ1_R1 y FASTQ2_R2
 IFS=',' read -ra _r1_check <<< "$FASTQ_R1"
 IFS=',' read -ra _r2_check <<< "$FASTQ_R2"
 for f in "${_r1_check[@]}" "${_r2_check[@]}"; do
@@ -174,37 +176,6 @@ for f in "${_r1_check[@]}" "${_r2_check[@]}"; do
         exit 1
     fi
 done
-
-
-# --------------- 0.d EJECUCIÓN EN SEGUNDO PLANO (opción -b) -----------------
-# Si se pidió -b, el script se relanza a sí mismo con nohup y en background,
-# y el proceso original (el que ve el usuario en su terminal) termina de
-# inmediato. Así, aunque se cierre la terminal o se corte la conexión SSH,
-# el pipeline real sigue corriendo en el servidor.
-#
-# Se usa "$(realpath "$0")" en vez de "$0" a secas: si el script se invocó
-# con una ruta relativa (./wgs_pipeline.sh) y el directorio de trabajo
-# cambiase antes de que nohup termine de lanzar el proceso, "$0" podría
-# dejar de apuntar al script correctamente.
-#
-# La variable de entorno WGS_PIPELINE_BG evita que el proceso relanzado
-# vuelva a relanzarse a sí mismo en un bucle infinito.
-if $BACKGROUND && [[ "${WGS_PIPELINE_BG:-0}" != "1" ]]; then
-    SCRIPT_PATH="$(realpath "$0")"
-    BG_LOG="$OUTDIR/logs/background_nohup.log"
-    log "Flag -b activado: relanzando el pipeline en segundo plano con nohup"
-    log "Puedes cerrar la terminal sin problema. Progreso en: $BG_LOG"
-    WGS_PIPELINE_BG=1 nohup "$SCRIPT_PATH" \
-         -r "$REF_GENOME" -1 "$FASTQ_R1" -2 "$FASTQ_R2" -s "$SAMPLE_ID" \
-        -t "$THREADS" -o "$OUTDIR" -q "$SUBSAMPLE_READS" \
-        > "$BG_LOG" 2>&1 < /dev/null &
-    disown
-    log "Proceso en segundo plano lanzado (PID $!)"
-    echo "PID: $!"
-    echo "Sigue el progreso con: tail -f \"$BG_LOG\""
-    exit 0
-fi
-
 
 # ------------------------ 1. CARGA / VARIABLES -------------------------------
 
@@ -217,7 +188,7 @@ log "== Iniciando pipeline para muestra: $SAMPLE_ID =="
 # directamente con "cat" sin descomprimir: el resultado es un gzip válido
 # "multi-miembro" que cualquier herramienta (fastqc, fastp, bwa) lee sin
 # problema, exactamente igual que si fuera un único archivo.
-#
+
 
 merge_fastqs() {
     local input_list="$1"

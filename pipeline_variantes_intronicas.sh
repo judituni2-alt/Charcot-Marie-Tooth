@@ -12,7 +12,7 @@
 #         |
 #   3. Filtro MAF (gnomAD)
 #         |
-#   4. Anotación VEP + SpliceAI (solo anotación, ya no filtra consecuencia)
+#   4. Anotación VEP + SpliceAI (solo anotación)
 #      (sin filtro de sinónimas: no aplica a intrones)
 #         |
 #   Variantes intrónicas candidatas (VCF final)
