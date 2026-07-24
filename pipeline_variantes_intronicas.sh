@@ -13,7 +13,6 @@
 #   3. Filtro MAF (gnomAD)
 #         |
 #   4. Anotación VEP + SpliceAI (solo anotación)
-#      (sin filtro de sinónimas: no aplica a intrones)
 #         |
 #   Variantes intrónicas candidatas (VCF final)
 #
@@ -25,29 +24,44 @@
 
 set -euo pipefail
 
-# ---------------------------------------------------------------------------
-# PARSEO DE FLAGS con getopts 
-# ---------------------------------------------------------------------------
-mostrar_ayuda() {
+# ---------------------------- 0. CONFIGURACIÓN ------------------------------
+
+# ---------------------------- Declaración de variables --------------------------
+
+VCF_RAW=""          # VCF con todas las variantes generado en el pipeline wgs_pipeline_vX
+SAMPLE_ID=""        # ID de la muestra
+GENES_BED=""        # Archivo BED de genes de interés
+INTRONES_BED=""     # Archivo BED de regiones intrónicas de genes de interes
+REF_GENOME=""       # Genoma de referencia
+VEP_CACHE_DIR=""    # Directorio con caché vep
+GNOMAD_VCF=""       # vcf de gnomad con frecuencia alelica (AF) por variante (específico según genoma referencia empleado)
+SPLICEAI_SNV=""     # Recurso SpliceAI para SNV
+SPLICEAI_INDEL=""   # Recurso SpliceAI para indels
+MAF_THRESHOLD=0.0001
+THREADS=8
+OUTDIR=""
+
+
+# ------------------------------------ Se crea función de uso ------------------
+usage() {
     cat <<EOF
-Uso: $(basename "$0") -v FILE -g FILE -i FILE -r FILE -c DIR -n FILE -x FILE -y FILE [opciones]
+Uso: $(basename "$0") -v CMT1234.vcf.gz -g CMT_genes.bed -i CMT_intrones_padded.bed -r ref.fasta -c vep_cache -n gnomad.genomes.af_only.vcf.gz -x spliceai_scores.raw.snv.hg38.vcf.gz -y spliceai_scores.raw.indel.hg38.vcf.gz)
 
 Obligatorios:
-  -v FILE   VCF crudo de entrada (post-QC general)
-  -g FILE   BED de genes completos (ej. genes_CMT.bed)
-  -i FILE   BED de intrones MANE + padding (generado con generar_bed_intrones.sh)
-  -r FILE   Genoma de referencia FASTA (GRCh38, indexado)
-  -c DIR    Carpeta de cache de VEP (--dir_cache)
-  -n FILE   VCF de recurso gnomAD (con AF por variante, GRCh38)
-  -x FILE   Recurso SpliceAI para SNV (spliceai_scores.raw.snv.hg38.vcf.gz)
-  -y FILE   Recurso SpliceAI para indels (spliceai_scores.raw.indel.hg38.vcf.gz)
-
+  -s ID de la muestra
+  -v VCF crudo de entrada
+  -g BED de genes completos
+  -i BED de intrones MANE + padding
+  -r Genoma de referencia FASTA
+  -c Carpeta de cache de VEP
+  -n VCF de recurso gnomAD (con AF por variante, GRCh38)
+  -x Recurso SpliceAI para SNV (spliceai_scores.raw.snv.hg38.vcf.gz)
+  -y Recurso SpliceAI para indels (spliceai_scores.raw.indel.hg38.vcf.gz)
+  -o Directorio de salida
 Opcionales:
-  -s ID     ID de la muestra (default: muestra01)
-  -m FLOAT  Umbral de MAF gnomAD (default: 0.0001)
-  -t N      Hilos/threads para VEP (default: 2)
-  -o DIR    Carpeta de salida (default: ./resultados_<SAMPLE_ID>)
-  -h        Muestra esta ayuda
+
+  -t Opcional. Hilos de procesador que se quieren utilizar en las herramientas que lo permitan. Por defecto 8
+
 
 También se pueden definir como variables de entorno (VCF_RAW, GENES_BED,
 INTRONES_BED, REF_GENOME, VEP_CACHE_DIR, GNOMAD_VCF, SPLICEAI_SNV,
@@ -69,6 +83,7 @@ Ejemplo:
 EOF
 }
 
+# -------------------------- Asignación de valores a variables mediante flags ------------------------------
 while getopts ":s:v:g:i:r:c:n:x:y:m:t:o:h" opt; do
     case "$opt" in
         s) SAMPLE_ID="$OPTARG" ;;

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 ################################################################################
-# B_wgs_pipeline_4.sh
+# wgs_pipeline_vX.sh
 #
 # Pipeline de análisis de Secuenciación de Genoma Completo (WGS) - línea germinal
 # Secuenciación -> Fusión FASTQ -> QC -> Alineamiento -> QC BAM -> Duplicados -> VCF
 #
 #
 # Uso:
-#   ./B_wgs_pipeline_4.sh
+#   ./wgs_pipeline_vX.sh
 #       -1 CMT1234_R1.fastq.gz -2 CMT1234_R2.fastq.gz -s CMT1234 -r ref.fasta -o resultados_CMT1234
 #
 #   Si la muestra viene repartida en varios archivos por carril de
@@ -15,7 +15,7 @@
 #   separados por coma en -1 y -2, y el pipeline los fusiona automáticamente en un único R1 y un único R2
 #   antes de continuar:
 #
-#   ./B_wgs_pipeline_4.sh
+#   ./wgs_pipeline_vX.sh
 #       -1 CMT1234_L001_R1.fastq.gz,CMT1234_L002_R1.fastq.gz \
 #       -2 CMT1234_L001_R2.fastq.gz,CMT1234_L002_R2.fastq.gz \
 #       -s CMT1234 -r ref.fasta
@@ -25,7 +25,7 @@
 #
 #
 #
-#   ./B_wgs_pipeline_4.sh -1 ... -2 ... -s CMT1234 -r ref.fasta  -o resultados_CMT1234
+#   ./wgs_pipeline_vX.sh -1 ... -2 ... -s CMT1234 -r ref.fasta  -o resultados_CMT1234
 #
 # Requiere instalar: fastqc, fastp, bwa, samtools, bamtools, picard, bcftools, tabix
 # Para ello crear un ambiente de conda/mamba con los recursos necesarios
@@ -52,6 +52,7 @@ FASTQ_R2=""            # uno o varios archivos separados por coma (lanes)
 OUTDIR=""              # directorio en el que se guardan los resultados
 THREADS=8              # Son los hilos, es decir, unidades de ejecución paralela. Valor por defecto: 8
 MAX_TRIM_ROUNDS=1      # nº máximo de intentos de recorte antes de abortar
+MAX_BAM_ROUNDS=1      # nº máximo de intentos de hacer el alineamiento antes de abortar
 SUBSAMPLE_READS=2000000  # nº de reads a submuestrear por archivo antes de FastQC (0 = desactivado, usa el archivo completo)
 
 # Nota de variable "SUBSAMPLE_READS": Para acelear la ejecución del pipeline solo se analiza la calidad de una muestra representativa
@@ -60,33 +61,6 @@ SUBSAMPLE_READS=2000000  # nº de reads a submuestrear por archivo antes de Fast
 # calidad de la secuenciación previamente a ejecutar el pipeline.
 # Se ha incluido este paso en el pipeline por ser un paso crucial y para mayor personalización
 # y automatización del proceso.
-
-# Módulos de FastQC que se consideran críticos para decidir si hace falta recortar.
-# Todos los  módulos posibles
-#  - Basic Statistics
-#  - Per base sequence quality
-#  - Per sequence quality scores
-#  - Per base sequence content
-#  - Per sequence GC content
-#  - Per base N content
-#  - Sequence Length Distribution
-#  - Sequence Duplication Levels
-#  - Overrepresented sequences
-#  - Adapter Content
-MODULOS_CRITICOS=(
-    "Per base sequence quality"
-    "Per sequence quality scores"
-    "Adapter Content"
-    "Overrepresented sequences"
-)
-
-# --- Parámetros de recorte/filtrado de fastp  ---
-# Ajusta estos valores según el criterio de tu pipeline.
-FASTP_CUT_WINDOW_SIZE=4            #     : tamaño de ventana para recorte por calidad deslizante (default fastp: 4)
-FASTP_CUT_MEAN_QUALITY=20          #     : calidad media mínima exigida en cada ventana (default fastp: 20, Q20)
-
-
-
 
 # ---------------------------- Crear función de uso ------------------------------
 
@@ -130,7 +104,7 @@ done
 
 
 # -------------------- Crear directorio y subsirectorios específicos para la muestra ------------------------------
-mkdir -p "$OUTDIR"/{merged,qc_raw,trimmed,qc_trimmed,align,qc_align,dedup,variants,logs,tmp_picard}
+mkdir -p "$OUTDIR"/{merged,qc_raw,trimmed,qc_trimmed,align,qc_align,align_repeated,qc_align_repeated,dedup,variants,logs,tmp_picard}
 # se crea directorio con la variable OUTDIR (dentro del disco externo) y los subdirectorios
 # tmp_picard: carpeta de archivos intermedios para Picard MarkDuplicates. Por defecto
 # Picard/Java usan el /tmp del sistema para los ficheros temporales de ordenación; con el uso de BAMs de WGS grandes
@@ -177,6 +151,11 @@ for f in "${_r1_check[@]}" "${_r2_check[@]}"; do
     fi
 done
 
+# IFS = ','. Así se cambia el Internal Field Separator que por defecto es tabulador, espacio o salto de linea
+# por coma
+
+
+
 # ------------------------ 1. CARGA / VARIABLES -------------------------------
 
 log "== Iniciando pipeline para muestra: $SAMPLE_ID =="
@@ -189,7 +168,7 @@ log "== Iniciando pipeline para muestra: $SAMPLE_ID =="
 # "multi-miembro" que cualquier herramienta (fastqc, fastp, bwa) lee sin
 # problema, exactamente igual que si fuera un único archivo.
 
-
+# ------------------------ Se crea función para unir los fastqs ------------------
 merge_fastqs() {
     local input_list="$1"
     local output_file="$2"
@@ -206,19 +185,47 @@ merge_fastqs() {
     fi
 }
 
-
+# ------------------------ Se definen las variables de los fastq unidos ------------------
 
 R1_MERGED="$OUTDIR/merged/${SAMPLE_ID}_R1.merged.fastq.gz"
 R2_MERGED="$OUTDIR/merged/${SAMPLE_ID}_R2.merged.fastq.gz"
 
+# ------------------------ Se aplica la funcion de merge a los fastq ------------------
 log "Fusionando FASTQ de entrada en un único R1/R2 por muestra"
 merge_fastqs "$FASTQ_R1" "$R1_MERGED"
+#FASTQ_R1 como primer argumento (input_list) y R1_MERGED como segundo argumento (output_file)
 merge_fastqs "$FASTQ_R2" "$R2_MERGED"
 
+ # ------------------------ Variables R1 y R2 para seguir trabajando ------------------
 R1="$R1_MERGED"
 R2="$R2_MERGED"
 
 # ------------------------ 2. ANÁLISIS DE CALIDAD (FastQC) -------------------
+
+# Módulos de FastQC que se consideran críticos para decidir si hace falta recortar.
+# Todos los  módulos posibles
+#  - Basic Statistics
+#  - Per base sequence quality
+#  - Per sequence quality scores
+#  - Per base sequence content
+#  - Per sequence GC content
+#  - Per base N content
+#  - Sequence Length Distribution
+#  - Sequence Duplication Levels
+#  - Overrepresented sequences
+#  - Adapter Content
+MODULOS_CRITICOS=(
+    "Per base sequence quality"
+    "Per sequence quality scores"
+    "Adapter Content"
+    "Overrepresented sequences"
+)
+
+# --- Parámetros de recorte/filtrado de fastp  ---
+# Ajusta estos valores según el criterio de tu pipeline.
+FASTP_CUT_WINDOW_SIZE=4            #     : tamaño de ventana para recorte por calidad deslizante (default fastp: 4)
+FASTP_CUT_MEAN_QUALITY=20          #     : calidad media mínima exigida en cada ventana (default fastp: 20, Q20)
+
 
 # Función para correr el analisis de calidad (fastqc)
 # se definen las variables locales r1 r2 y outdir
@@ -229,6 +236,8 @@ R2="$R2_MERGED"
 # (en background con &, sincronizados con wait) para aprovechar 2 hilos en
 # vez de leer los FASTQ completos en serie. FastQC se ejecuta después sobre
 # esas copias pequeñas, mucho más rápido, y las copias se borran al acabar.
+
+# ------------------------ Se crea funcion para correr el fastqc ------------------
 run_fastqc() {
     local r1=$1 r2=$2 outdir=$3
     local fastqc_r1="$r1"
@@ -237,18 +246,18 @@ run_fastqc() {
 
     if [[ "$SUBSAMPLE_READS" -gt 0 ]]; then
         subdir="$OUTDIR/tmp_fastqc_subsample"
-        mkdir -p "$subdir"
-        rm -f "$subdir"/*
-        local nlines=$((SUBSAMPLE_READS * 4))
+        mkdir -p "$subdir" # crea la carpeta
+        rm -f "$subdir"/*  # borra el contenido de la carpeta por si hubiera archivos de ejecuciones anteriores
+        local nlines=$((SUBSAMPLE_READS * 4)) #*4 porque cada read ocupa 4 lineas (identificador, secuencia, +, calidad)
         fastqc_r1="$subdir/$(basename "$r1")"
         fastqc_r2="$subdir/$(basename "$r2")"
 
         log "Submuestreando $SUBSAMPLE_READS reads de $r1 y $r2 para FastQC (en paralelo)"
-        zcat "$r1" | head -n "$nlines" | gzip > "$fastqc_r1" &
+        zcat "$r1" | head -n "$nlines" | gzip > "$fastqc_r1" & #descomprime las nlines primeras y las vuelve acomprimir con gzip en fastqc_r1
         zcat "$r2" | head -n "$nlines" | gzip > "$fastqc_r2" &
-        wait
+        wait  # se detiene hasta que los dos procesos han acabado
     fi
-
+    # Se ejecuta el fastqc sobre las submuestras
     log "Ejecutando FastQC sobre $fastqc_r1 y $fastqc_r2"
     fastqc -t "$THREADS" -o "$outdir" "$fastqc_r1" "$fastqc_r2" &> "$OUTDIR/logs/fastqc_${outdir##*/}.log"
 
@@ -257,10 +266,12 @@ run_fastqc() {
 
 # &> manda los mensajes de progreso a un archivo en la carpeta logs
 
-# Se crea funcion qc_pasa_criterios
+# ------------------------ Se crea funcion para pasar criterios ------------------
+
 # Comprueba si FastQC ha marcado FAIL en alguno de los módulos definidos como críticos
 # en MODULOS_CRITICOS (ver configuración arriba). Módulos no listados ahí no bloquean
 # el pipeline aunque FastQC los marque como FAIL o WARN.
+
 qc_pasa_criterios() {
     local outdir=$1
     local fail=0
@@ -294,16 +305,17 @@ qc_pasa_criterios() {
 
 # ------------------------ 3. BUCLE QC -> RECORTE (¿Cumple criterios?) --------
 
-round=0
 qc_dir="$OUTDIR/qc_raw"
 # definimos la variables qc_dir que es el nombre de la ruta donde tiene que guardar los archivos la funcion run_fastqc
+
+# ------------------------ Se ejecuta funcion run_fastqc --------
 run_fastqc "$R1" "$R2" "$qc_dir"
-# le damos valores a las variables locales de la funcion run_fastqc
+
 
 
 # FASTP: es una herramienta utilizada concretamente para short reads (Illumina, Sanger)
 
-
+round=0
 while ! qc_pasa_criterios "$qc_dir"; do
     round=$((round+1))
     if [[ $round -gt $MAX_TRIM_ROUNDS ]]; then
@@ -324,7 +336,7 @@ while ! qc_pasa_criterios "$qc_dir"; do
           --html "$OUTDIR/trimmed/${SAMPLE_ID}_fastp.html" \
           &> "$OUTDIR/logs/fastp_round${round}.log"
 
-
+# Se redefinen las variables R1 y R2 para que se ejecute el run_fastq sobre los fastq_trimmed
     R1="$OUTDIR/trimmed/${SAMPLE_ID}_R1.trim.fastq.gz"
     R2="$OUTDIR/trimmed/${SAMPLE_ID}_R2.trim.fastq.gz"
 
@@ -334,6 +346,7 @@ while ! qc_pasa_criterios "$qc_dir"; do
     rm -rf "$qc_dir"/*
     run_fastqc "$R1" "$R2" "$qc_dir"
 done
+
 log "Sí cumple criterios de calidad -> continuando con alineamiento"
 
 # Bucle while: mientras los datos no cumplan los criterios de calidad, 
@@ -357,19 +370,38 @@ run_alineamiento() {
         | samtools sort -@ "$THREADS" -o "$BAM_RAW" -
     samtools index "$BAM_RAW"
 }
+
+# -R "@RG Crea un Read Group identificador en el BAM que se va a generar compuesto por
+#     -ID: identificador del lane/run de secuenciación
+#     -SM: identificador del paciente
+#     -PL: Identificador de la plataforma
+# Se incorpora tuberia entre bwa mem y samtools para que no se genere archivo SAM intermedio,
+# optimizando así el proceso
+# samtools index genera el archivo .bai
+
+# ------------------------ Se ejecuta alineamiento ---------
 run_alineamiento
 
 # ------------------------ 5. ANÁLISIS DE CALIDAD DEL BAM (BAMtools) ---------
 
+# ------------------------ Se crea la función para el control de calidad del BAM ---------
 run_qc_bam() {
-    log "Ejecutando control de calidad del BAM (bamtools stats + samtools flagstat)"
-    bamtools stats -in "$BAM_RAW" > "$OUTDIR/qc_align/${SAMPLE_ID}_bamtools_stats.txt"
-    samtools flagstat "$BAM_RAW" > "$OUTDIR/qc_align/${SAMPLE_ID}_flagstat.txt"
+    local qc_dir="$1"
+    log "Ejecutando control de calidad del BAM (bamtools stats + samtools flagstat) en $qc_dir"
+    bamtools stats -in "$BAM_RAW" > "${qc_dir}/${SAMPLE_ID}_bamtools_stats.txt"
+    samtools flagstat "$BAM_RAW" > "${qc_dir}/${SAMPLE_ID}_flagstat.txt"
 }
-run_qc_bam
 
+# ------------------------ Se ejecuta control de calidad del BAM ---------
+
+QC_DIR="$OUTDIR/qc_align"
+run_qc_bam "$QC_DIR"
+
+
+# ------------------------ Se crea función evaluar si pasa criterios de calidad ---------
 # Criterio simple de calidad del BAM: % de lecturas mapeadas >= 90%
 bam_pasa_criterios() {
+    local qc_dir="$1"
     local pct
     pct=$(grep "mapped (" "$OUTDIR/qc_align/${SAMPLE_ID}_flagstat.txt" | head -1 \
           | grep -oP '\(\K[0-9.]+(?=%)')
@@ -377,18 +409,28 @@ bam_pasa_criterios() {
     awk -v p="$pct" 'BEGIN{exit !(p>=90)}'
 }
 
-if ! bam_pasa_criterios; then
-    log "No cumple criterios de calidad del BAM -> se recomienda revisar el alineamiento (parámetros, referencia)"
-    log "El pipeline continúa pero revisa $OUTDIR/qc_align antes de confiar en el VCF final."
-else
-    log "Sí cumple criterios de calidad del BAM -> continuando"
+round_bam=0
+while ! bam_pasa_criterios; do
+round_bam=$((round_bam+1))
+if [[ $round_bam -gt $MAX_BAM_ROUNDS ]]; then
+    log "No cumple criterios de calidad del BAM -> Se recomienda valorar nueva secuenciación. Abortando"
+exit 1
 fi
+log "No cumple criterios de calidad -> Repitiendo alineamiento"
+
+BAM_RAW="$OUTDIR/align_repeated/${SAMPLE_ID}.repeat${round_bam}.sorted.bam"
+    QC_DIR="$OUTDIR/qc_align_repeated"
+    run_alineamiento
+    run_qc_bam "$QC_DIR"
+done
+
+log "Si cumple criterios de calidad -> continuando a marcaje duplicados"
 
 # ------------------------ 6. MARCAR DUPLICADOS PCR (Picard) ---------------
 
 BAM_DEDUP="$OUTDIR/dedup/${SAMPLE_ID}.dedup.bam"
 
-log "Marcando duplicados PCR con Picard MarkDuplicates (TMP_DIR=$OUTDIR/tmp_picard)"
+log "Eliminando duplicados PCR con Picard MarkDuplicates (TMP_DIR=$OUTDIR/tmp_picard)"
 picard MarkDuplicates \
     I="$BAM_RAW" \
     O="$BAM_DEDUP" \
@@ -404,11 +446,6 @@ rm -rf "${OUTDIR:?}/tmp_picard"/*
 samtools index "$BAM_DEDUP"
 
 # ------------------------ 7. LLAMADO DE VARIANTES (bcftools mpileup+call) ---
-# Se sustituye GATK HaplotypeCaller por bcftools mpileup + bcftools call.
-# Es un llamador más ligero (menos dependencias, más rápido) y suficiente
-# para variantes germinales individuales; GATK suele preferirse cuando se
-# necesita el procesado conjunto de cohortes (GVCF + GenotypeGVCFs) o los
-# pasos de recalibración de variantes (VQSR), que aquí no se usan.
 #
 #   bcftools mpileup: calcula las probabilidades genotípicas por posición
 #                      a partir del BAM (equivalente al primer paso de GATK).
@@ -434,6 +471,6 @@ bcftools mpileup \
         2> "$OUTDIR/logs/bcftools_call.log"
 
 tabix -p vcf "$VCF_OUT"
-
+# tabix para indexado del vcf final. Genera archivo .tbi
 log "== Pipeline completado. VCF final: $VCF_OUT =="
 log "Todos los resultados quedan en el disco externo: $OUTDIR"

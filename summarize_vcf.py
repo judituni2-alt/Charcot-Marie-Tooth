@@ -2,15 +2,13 @@
 """
 summarize_vcf.py
 
-Genera un resumen tabular (CSV) del VCF final del pipeline:
+Genera un resumen:
  - nº de variantes totales
  - nº de SNPs vs indels
  - distribución de calidad (QUAL)
  - variantes por cromosoma
 
-Requiere: cyvcf2 (pip install cyvcf2 
-Uso:
-    python summarize_vcf.py resultados/variants/muestra.g.vcf.gz resumen_muestra.csv
+
 """
 
 import sys
@@ -52,4 +50,4 @@ def summarize(vcf_path: str) -> None:
 
 if __name__ == "__main__":
     summarize(
-        "/mnt/d/resultados_NeurMUS1409/variants/NeurMUS_1409.vcf.gz")
+        "/mnt/d/resultados_CBK15496/variants/CBK15496.vcf.gz")
