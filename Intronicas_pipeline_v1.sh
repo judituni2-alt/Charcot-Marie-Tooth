@@ -37,9 +37,9 @@ VEP_CACHE_DIR=""    # Directorio con caché vep
 GNOMAD_VCF=""       # vcf de gnomad con frecuencia alelica (AF) por variante (específico según genoma referencia empleado)
 SPLICEAI_SNV=""     # Recurso SpliceAI para SNV
 SPLICEAI_INDEL=""   # Recurso SpliceAI para indels
-MAF_THRESHOLD=0.0001
-THREADS=8
-OUTDIR=""
+MAF_THRESHOLD=0.0001 # MAF: minimum allele frequency
+THREADS=8            # Hilos de procesador utilizados: 8 por defecto
+OUTDIR=""            # Directorio de salida
 
 
 # ------------------------------------ Se crea función de uso ------------------
@@ -62,12 +62,6 @@ Opcionales:
 
   -t Opcional. Hilos de procesador que se quieren utilizar en las herramientas que lo permitan. Por defecto 8
 
-
-También se pueden definir como variables de entorno (VCF_RAW, GENES_BED,
-INTRONES_BED, REF_GENOME, VEP_CACHE_DIR, GNOMAD_VCF, SPLICEAI_SNV,
-SPLICEAI_INDEL, SAMPLE_ID, MAF_THRESHOLD, THREADS, OUTDIR); los flags, si
-se indican, tienen prioridad.
-
 Ejemplo:
   $(basename "$0") \\
       -s paciente01 \\
@@ -76,10 +70,10 @@ Ejemplo:
       -i intrones_mane_padded.bed \\
       -r GRCh38.fa \\
       -c /ruta/.vep \\
-      -n gnomad.genomes.af_only.vcf.gz \\
+      -n gnomad.genomes.vcf.gz \\
       -x spliceai_scores.raw.snv.hg38.vcf.gz \\
       -y spliceai_scores.raw.indel.hg38.vcf.gz \\
-      -m 0.0001 -t 4 -o resultados_paciente01
+      -m 0.0001 -t 8 -o resultados_paciente01
 EOF
 }
 
@@ -103,30 +97,18 @@ while getopts ":s:v:g:i:r:c:n:x:y:m:t:o:h" opt; do
         :)  echo "ERROR: la opción -$OPTARG requiere un valor" >&2; mostrar_ayuda; exit 1 ;;
     esac
 done
-shift $((OPTIND - 1))
 
-# ---------------------------------------------------------------------------
-# CONFIGURACIÓN (valores por flag, si no, por variable de entorno)
-# Nota: SAMPLE_ID y OUTDIR se resuelven ANTES que VCF_RAW/GENES_BED, porque
-# estos últimos usan $OUTDIR en su valor por defecto (orden corregido
-# respecto a la versión anterior, donde OUTDIR se definía después de usarse).
-# ---------------------------------------------------------------------------
-SAMPLE_ID="${SAMPLE_ID:-muestra01}"
-OUTDIR="${OUTDIR:-$(pwd)/resultados_${SAMPLE_ID}}"
+# ---------------------- Comprobación de que las variables obligatorias están definidas ------------------------
 
-VCF_RAW="${VCF_RAW:?Debe definir VCF_RAW (-v o variable de entorno)}"
-GENES_BED="${GENES_BED:?Debe definir GENES_BED (-g o variable de entorno)}"
-INTRONES_BED="${INTRONES_BED:?Debe definir INTRONES_BED (-i o variable de entorno)}"
-REF_GENOME="${REF_GENOME:?Debe definir REF_GENOME (-r o variable de entorno)}"
-VEP_CACHE_DIR="${VEP_CACHE_DIR:?Debe definir VEP_CACHE_DIR (-c o variable de entorno)}"
-GNOMAD_VCF="${GNOMAD_VCF:?Debe definir GNOMAD_VCF (-n o variable de entorno)}"
-SPLICEAI_SNV="${SPLICEAI_SNV:?Debe definir SPLICEAI_SNV (-x o variable de entorno)}"
-SPLICEAI_INDEL="${SPLICEAI_INDEL:?Debe definir SPLICEAI_INDEL (-y o variable de entorno)}"
-MAF_THRESHOLD="${MAF_THRESHOLD:-0.0001}"
-THREADS="${THREADS:-2}"
+[[ -z "$SAMPLE_ID" || -z "VCF_RAW" || -z "GENES_BED" || -z "INTRONES_BED" || -z "REF_GENOME" || -z "VEP_CACHE_DIR" || -z "GNOMAD_VCF" || -z "SPLICEAI_SNV"  || -z "SPLICEAI_INDEL"  || -z "MAF_THERESHOLD"  ]] && usage
+# comprueba si las variables especificadas estan vacias (-z, zero length es TRUE)
+# Si lo están ejecuta usage y se para el pipeline
+
+# -------------------- Crear directorio y subsirectorios específicos para la muestra ---------------------
 
 mkdir -p "$OUTDIR"/{01_genes,02_intronicas,03_maf,04_spliceai,logs}
 
+# ---------------------------- Creación de la función log ------------------------------
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 # ---------------------------------------------------------------------------
@@ -143,6 +125,13 @@ tabix -p vcf "$VCF_GENES"
 N_GENES=$(bcftools view -H "$VCF_GENES" | wc -l)
 log "  Variantes tras filtro de genes: $N_GENES"
 
+# bedtools intersect: compara dos archivos de coordenadas genómicas, 
+# el VCF original (-a $VCF_RAW) y el BED de genes (-b $GENES_BED).
+# -header conserva las líneas de cabecera del VCF original en la salida
+# -u asegura que las variantes que caen en genes solapante se cuenten 1 sola vex
+# se comprime el resulfato con bgzip y se crea un archivo vcf.tbi con tabix
+
+# bcftools view -H "$VCF_GENES" | wc -l quita la cabecera y cuenta el numero de lineas
 # ---------------------------------------------------------------------------
 # 2. SEPARAR RAMA INTRÓNICA (BED de intrones MANE + padding)
 # ---------------------------------------------------------------------------
@@ -157,12 +146,14 @@ tabix -p vcf "$VCF_INTRONICAS"
 N_INTRON=$(bcftools view -H "$VCF_INTRONICAS" | wc -l)
 log "  Variantes intrónicas (rama seleccionada): $N_INTRON"
 
+# mismo procedimiento que antes para filtrar las regiones intrónicas
+
 # ---------------------------------------------------------------------------
 # 3. FILTRO DE FRECUENCIA POBLACIONAL (MAF, gnomAD)
 # ---------------------------------------------------------------------------
 VCF_MAF_ANOT="$OUTDIR/03_maf/${SAMPLE_ID}.intronicas.gnomad_annot.vcf.gz"
 VCF_MAF="$OUTDIR/03_maf/${SAMPLE_ID}.intronicas.maf_filtered.vcf.gz"
-
+# Primero se anota cada variante con su MAF
 log "Paso 3/4: anotando y filtrando por MAF gnomAD (< $MAF_THRESHOLD)"
 bcftools annotate \
     -a "$GNOMAD_VCF" \
@@ -172,6 +163,7 @@ bcftools annotate \
     2> "$OUTDIR/logs/03_bcftools_annotate_gnomad.log"
 tabix -p vcf "$VCF_MAF_ANOT"
 
+# Se filtra segun el MAF threshold definido anteriormente
 # Se conservan variantes sin AF_gnomad anotado (candidatas ausentes de gnomAD)
 bcftools filter \
     -e "INFO/AF_gnomad > $MAF_THRESHOLD" \
@@ -180,13 +172,12 @@ bcftools filter \
     2> "$OUTDIR/logs/03_bcftools_filter_maf.log"
 tabix -p vcf "$VCF_MAF"
 
+# Conteo de numero de variantes tras el filtro
 N_MAF=$(bcftools view -H "$VCF_MAF" | wc -l)
 log "  Variantes intrónicas tras filtro MAF: $N_MAF"
 
 # ---------------------------------------------------------------------------
-# 4. ANOTACIÓN VEP + SpliceAI (solo anotación: la separación intrón/exón ya
-#    se hizo por BED en el paso 2, aquí VEP no filtra nada)
-#    Sin filtro de sinónimas: no aplica a variantes intrónicas.
+# 4. ANOTACIÓN VEP
 # ---------------------------------------------------------------------------
 VCF_FINAL="$OUTDIR/04_spliceai/${SAMPLE_ID}.intronicas.spliceai.vcf.gz"
 
