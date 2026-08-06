@@ -2,21 +2,16 @@
 """
 summarize_vcf.py
 
-Genera un resumen tabular (CSV) del VCF final del pipeline:
+Genera un resumen del VCF crudo final del pipeline de preprocesamiento:
  - nº de variantes totales
  - nº de SNPs vs indels
  - distribución de calidad (QUAL)
  - variantes por cromosoma
 
-Requiere: cyvcf2 (pip install cyvcf2 
-Uso:
-    python summarize_vcf.py resultados/variants/muestra.g.vcf.gz resumen_muestra.csv
 """
 
 import sys
 import pandas as pd
-from cyvcf2 import VCF
-print(sys.executable)
 
 def summarize(vcf_path: str, out_csv: str) -> None:
     vcf = VCF(vcf_path)
@@ -48,9 +43,6 @@ def summarize(vcf_path: str, out_csv: str) -> None:
     print("\nPor cromosoma (top 10):")
     print(resumen_chrom.head(10).to_string())
     print(f"\nQUAL medio: {df['qual'].mean():.2f}  |  QUAL mediana: {df['qual'].median():.2f}")
-
-    df.to_csv(out_csv, index=False)
-    print(f"\nDetalle completo guardado en: {out_csv}")
 
 
 if __name__ == "__main__":
