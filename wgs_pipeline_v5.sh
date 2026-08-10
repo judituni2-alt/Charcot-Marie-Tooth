@@ -43,7 +43,7 @@ set -euo pipefail
 
 # ---------------------------- 0. CONFIGURACIÓN ------------------------------
 
-# ---------------------------- Creación de variables --------------------------
+# ---------------------------- Declaración de variables --------------------------
 
 REF_GENOME=""          # ruta al genoma de referencia
 SAMPLE_ID=""           # ID de la muestra
@@ -113,9 +113,7 @@ mkdir -p "$OUTDIR"/{merged,qc_raw,trimmed,qc_trimmed,align,qc_align,align_repeat
 # guarden en este directorio.
 
 # ---------------------------- Creación de la función log ------------------------------
-
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$OUTDIR/logs/pipeline.log" >&2; }
-
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$OUTDIR/logs/pipeline.log"; }
 # se crea la función log para registrar las salidas del pipeline, el día y la hora
 
 # ----------------- Primeros logs, resultados de los chequeos hasta ahora ----------------------------
@@ -188,13 +186,15 @@ merge_fastqs() {
 }
 
 # ------------------------ Se definen las variables de los fastq unidos ------------------
+
 R1_MERGED="$OUTDIR/merged/${SAMPLE_ID}_R1.merged.fastq.gz"
 R2_MERGED="$OUTDIR/merged/${SAMPLE_ID}_R2.merged.fastq.gz"
 
-# ------------------------ Se aplica la fusión a los fastq ------------------
+# ------------------------ Se aplica la funcion de merge a los fastq ------------------
 log "Fusionando FASTQ de entrada en un único R1/R2 por muestra"
-R1_MERGED=$(merge_fastqs "$FASTQ_R1" "$R1_MERGED")
-R2_MERGED=$(merge_fastqs "$FASTQ_R2" "$R2_MERGED")
+merge_fastqs "$FASTQ_R1" "$R1_MERGED"
+#FASTQ_R1 como primer argumento (input_list) y R1_MERGED como segundo argumento (output_file)
+merge_fastqs "$FASTQ_R2" "$R2_MERGED"
 
  # ------------------------ Variables R1 y R2 para seguir trabajando ------------------
 R1="$R1_MERGED"
