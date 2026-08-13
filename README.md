@@ -82,3 +82,26 @@ Genera un resumen del VCF crudo final del pipeline de preprocesamiento:
  - variantes por cromosoma
 
 ## Pasos para realizar el filtrado de variantes candidatas
+
+Archivos necesarios para el filtrado de variantes
+- VCF con todas las variantes (ya generado)
+- Archivo BED genes de interes (en el repositorio)
+- Archivo BED genes de interés regiones intrónicas (en repositorio)
+- Genoma de referencia (ya descargado)
+- Directorio con cache vep (crear)
+- VCF gnomAD con frecuencia alelica
+- Recurso SpliceAI para SNV
+- Recurso SpliceAI para indels
+
+  
+Crear directorio con cache vep
+```sh
+mkdir -p /ruta/vep_cache
+cd /ruta/vep_cache
+wget https://ftp.ensembl.org/pub/release-113/variation/indexed_vep_cache/homo_sapiens_vep_113_GRCh38.tar.gz
+tar -xzf homo_sapiens_vep_113_GRCh38.tar.gz
+```
+
+
+
+
