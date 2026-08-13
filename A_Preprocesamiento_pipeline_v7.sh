@@ -1,36 +1,4 @@
 #!/usr/bin/env bash
-################################################################################
-# wgs_pipeline_vX.sh
-#
-# Pipeline de análisis de Secuenciación de Genoma Completo (WGS) - línea germinal
-# Secuenciación -> Fusión FASTQ -> QC -> Alineamiento -> QC BAM -> Duplicados -> VCF
-#
-#
-# Uso:
-#   ./wgs_pipeline_vX.sh
-#       -1 CMT1234_R1.fastq.gz -2 CMT1234_R2.fastq.gz -s CMT1234 -r ref.fasta -o resultados_CMT1234
-#
-#   Si la muestra viene repartida en varios archivos por carril de
-#   secuenciación (lane splitting, L001, L002, L003...),se pueden indicar varios archivos
-#   separados por coma en -1 y -2, y el pipeline los fusiona automáticamente en un único R1 y un único R2
-#   antes de continuar:
-#
-#   ./wgs_pipeline_vX.sh
-#       -1 CMT1234_L001_R1.fastq.gz,CMT1234_L002_R1.fastq.gz \
-#       -2 CMT1234_L001_R2.fastq.gz,CMT1234_L002_R2.fastq.gz \
-#       -s CMT1234 -r ref.fasta
-#       -o resultados_CMT1234
-#
-#   Es importante que los lanes esten en el mismo orden en -1 respecto a -2
-#
-#
-#
-#   ./wgs_pipeline_vX.sh -1 ... -2 ... -s CMT1234 -r ref.fasta  -o resultados_CMT1234
-#
-# Requiere instalar: fastqc, fastp, bwa, samtools, bamtools, picard, bcftools, tabix
-# Para ello crear un ambiente de conda/mamba con los recursos necesarios
-#
-###############################################################################
 
 set -euo pipefail
 # activa 3 procedimientos de seguridad en caso de que el script falle
@@ -67,8 +35,8 @@ OUTDIR=""
 usage() {
     cat <<EOF
 Uso: $0  -r ref.fasta -1 R1.fastq.gz -2 R2.fastq.gz -s sample_id -o outdir [-t threads] [-b] [-q subsample_reads]
-  -r        Obligatorio. Genoma de referencia en formato FASTA.
-  -1 / -2   Obligatorio. Admiten varios archivos separados por coma (sin espacios) si la
+  -r        Obligatorio.          Genoma de referencia en formato FASTA.
+  -1 / -2   Obligatorio.          Admiten varios archivos separados por coma (sin espacios) si la
             muestra está repartida en varios carriles/lanes, ej:
             -1 L001_R1.fastq.gz,L002_R1.fastq.gz
   -s        Obligatorio. Identificador de la muestra
@@ -76,6 +44,7 @@ Uso: $0  -r ref.fasta -1 R1.fastq.gz -2 R2.fastq.gz -s sample_id -o outdir [-t t
   -t        Opcional. Hilos de procesador que se quieren utilizar en las herramientas que lo permitan. Por defecto 8
   -q        Nº de reads a submuestrear por archivo antes de FastQC
             (por defecto 2000000). Usar -q 0 para analizar el FASTQ completo.
+  -b        Opcional. Para ejecutar en background. Para activarla utilizar el flag -b
 EOF
     exit 1   # si se invoca directa o indirectamente función de uso el script no sigue corriendo. 
 }
@@ -105,7 +74,7 @@ done
 # en el servidor.
 #
 # Se usa "$(realpath "$0")" en vez de "$0" a secas: si el script se invocó
-# con una ruta relativa (./wgs_pipeline.sh) y el directorio de trabajo
+# con una ruta relativa y el directorio de trabajo
 # cambiase antes de que nohup termine de lanzar el proceso, "$0" podría
 # dejar de apuntar al script correctamente.
 #
