@@ -43,7 +43,7 @@ set -euo pipefail
 
 # ---------------------------- 0. CONFIGURACIÓN ------------------------------
 
-# ---------------------------- Creación de variables --------------------------
+# ---------------------------- Declaración de variables --------------------------
 
 REF_GENOME=""          # ruta al genoma de referencia
 SAMPLE_ID=""           # ID de la muestra
