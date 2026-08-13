@@ -2,21 +2,6 @@
 
 #!/usr/bin/env bash
 #
-# pipeline_variantes_intronicas.sh
-#
-# Flujo (rama intrónica únicamente):
-#
-#   VCF crudo (post-QC)
-#         |
-#   1. Filtro de genes (BED genes CMT, gen completo)
-#         |
-#   2. Separar intrónico (BED intrones_mane_padded.bed)
-#         |
-#   3. Filtro MAF (gnomAD)
-#         |
-#   4. Anotación VEP + SpliceAI (solo anotación)
-#         |
-#   Variantes intrónicas candidatas (VCF final)
 #
 # Requisitos: bcftools, bedtools, tabix, vep (con cache offline + plugin SpliceAI),
 #             recurso gnomAD (AF por variante), recursos SpliceAI (snv/indel).
