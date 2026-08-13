@@ -69,16 +69,16 @@ Si la muestra viene repartida en varios archivos por carril de secuenciación (l
 ```
 Una vez ejecutado el pipeline se obtendrá el Archvio VCF crudo que contiene todas las variantes resultantes del Variant Calling
 
-Para generar un resumen numérico de las variantes obtenidas, en un IDE compatible con python, se puede abrir y ejecutar el siguiente script
+## Pasos para generar resumen numérico de Archivo VCF
 ```sh
-B_resumen_vcf_preprocesamiento
+conda create -n Resumen_vcf -c conda-forge -c bioconda pandas cyvcf2 
+```
+```sh
+python B_Resumen_vcf_preprocesamiento_v3.py   --vcf /home/juditdvm/Charcot-Marie-Tooth/TEST.vcf.gz    --log-level INFO
 ```
 Genera un resumen del VCF crudo final del pipeline de preprocesamiento:
  - nº de variantes totales
  - nº de SNPs vs indels
- - distribución de calidad (QUAL)
  - variantes por cromosoma
-
-
 
 ## Pasos para realizar el filtrado de variantes candidatas
