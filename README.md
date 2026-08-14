@@ -1,4 +1,6 @@
 # PIPELINE VARIANTES INTRÓNICAS CHARCOT-MARIE-TOOTH
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 El pipeline sigue el siguiente flujo de trabajo
 
 Preprocesamiento
@@ -81,9 +83,9 @@ Genera un resumen del VCF crudo final del pipeline de preprocesamiento:
  - nº de SNPs vs indels
  - variantes por cromosoma
 
-## Pasos para realizar el filtrado de variantes candidatas
+## Pasos para realizar el filtrado de variantes candidatas (Filtrado 1)
 
-Archivos necesarios para el filtrado de variantes
+Archivos necesarios para el filtrado de variantes 
 - VCF con todas las variantes (ya generado)
 - Archivo BED genes de interes (en el repositorio)
 - Archivo BED genes de interés regiones intrónicas+15pb hacia el exon (en repositorio)
@@ -142,3 +144,5 @@ Para convertir el tsv generado en un csv
 ```
 python -c "import pandas as pd; pd.read_csv('input.tsv', sep='\t').to_csv('output.csv', index=False)"
 ```
+## Pasos para realizar el filtrado de variantes candidatas (Filtrado 2)
+
