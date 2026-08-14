@@ -101,6 +101,27 @@ cd /ruta/vep_cache
 wget https://ftp.ensembl.org/pub/release-113/variation/indexed_vep_cache/homo_sapiens_vep_113_GRCh38.tar.gz
 tar -xzf homo_sapiens_vep_113_GRCh38.tar.gz
 ```
+Crear entorno conda para ejecutar el script
+```sh
+conda create -n filtrado
+```
+Para realizar el filtrado ejecutar:
+```sh
+./F_pipeline_filtrado_v3.sh
+-s paciente01 \
+      -v paciente01.raw.vcf.gz \
+      -g genes.bed \
+      -i intrones_padded.bed \
+      -r GRCh38.fasta \
+      -c /ruta/.vep \
+      -n gnomad.genomes.vcf.gz \
+      -x spliceai_scores.raw.snv.hg38.vcf.gz \
+      -y spliceai_scores.raw.indel.hg38.vcf.gz \
+      -m 0.01 -t 8 -o resultados_paciente01
+```
+Para crear un tsv a partir del vfc generado
+
+
 
 
 
