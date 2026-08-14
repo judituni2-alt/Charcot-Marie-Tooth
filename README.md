@@ -134,6 +134,8 @@ awk -F'\t' 'BEGIN {OFS="\t"} {
 }'
 } > output.tsv
 ```
-
-
+Para filtrar el archivo tsv de manera que se genere otro con variantes que tengan algún valor SpliceAI_pred_DS>0.2
+```
+python -c "import pandas as pd; df=pd.read_csv('input.tsv', sep='\t'); cols=['SpliceAI_pred_DS_AG','SpliceAI_pred_DS_AL','SpliceAI_pred_DS_DG','SpliceAI_pred_DS_DL']; df[cols]=df[cols].apply(pd.to_numeric, errors='coerce'); df[df[cols].max(axis=1)>0.2].to_csv('spliceAI_gt_0.2.tsv', sep='\t', index=False)"
+```
 
