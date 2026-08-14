@@ -120,9 +120,20 @@ Para realizar el filtrado ejecutar:
       -m 0.01 -t 8 -o resultados_paciente01
 ```
 Para crear un tsv a partir del vfc generado
+```
+{
+    echo -e "CHROM\tPOS\tREF\tALT\tAllele\tConsequence\tIMPACT\tSYMBOL\tGene\tFeature_type\tFeature\tBIOTYPE\tEXON\tINTRON\tHGVSc\tHGVSp\tcDNA_position\tCDS_position\tProtein_position\tAmino_acids\tCodons\tExisting_variation\tDISTANCE\tSTRAND\tFLAGS\tSYMBOL_SOURCE\tHGNC_ID\tMANE\tMANE_SELECT\tSpliceAI_pred_DP_AG\tSpliceAI_pred_DP_AL\tSpliceAI_pred_DP_DG\tSpliceAI_pred_DP_DL\tSpliceAI_pred_DS_AG\tSpliceAI_pred_DS_AL\tSpliceAI_pred_DS_DG\tSpliceAI_pred_DS_DL\tSpliceAI_pred_SYMBOL"
 
-
-
+bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%INFO/CSQ\n' input.vcf.gz |
+awk -F'\t' 'BEGIN {OFS="\t"} {
+    n=split($5,a,"|")
+    printf "%s\t%s\t%s\t%s", $1,$2,$3,$4
+    for(i=1;i<=n;i++)
+        printf "\t%s",a[i]
+    printf "\n"
+}'
+} > output.tsv
+```
 
 
 
