@@ -86,7 +86,7 @@ Genera un resumen del VCF crudo final del pipeline de preprocesamiento:
 Archivos necesarios para el filtrado de variantes
 - VCF con todas las variantes (ya generado)
 - Archivo BED genes de interes (en el repositorio)
-- Archivo BED genes de interés regiones intrónicas (en repositorio)
+- Archivo BED genes de interés regiones intrónicas+15nt hacia el exon (en repositorio)
 - Genoma de referencia (ya descargado)
 - Directorio con cache vep (crear)
 - VCF gnomAD con frecuencia alelica
