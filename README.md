@@ -83,19 +83,32 @@ Genera un resumen del VCF crudo final del pipeline de preprocesamiento:
  - nº de SNPs vs indels
  - variantes por cromosoma
 
-## Pasos para realizar el filtrado de variantes candidatas (Filtrado 1)
+## Pasos para realizar el filtrado de variantes
 
 Archivos necesarios para el filtrado de variantes 
 - VCF con todas las variantes (ya generado)
 - Archivo BED genes de interes (en el repositorio)
 - Archivo BED genes de interés regiones intrónicas+15pb hacia el exon (en repositorio)
 - Genoma de referencia (ya descargado)
-- Directorio con cache vep (crear)
 - VCF gnomAD con frecuencia alelica
-- Recurso SpliceAI para SNV
-- Recurso SpliceAI para indels
 
-  
+Crear entorno conda para ejecutar el script
+```sh
+conda create -n Filtrado -c conda-forge -c bioconda bcftools bedtools tabix
+```
+Para realizar el filtrado ejecutar:
+```sh
+./E_pipeline_filtrado_v4.sh
+-s paciente01 \
+      -v CMT1234.raw.vcf.gz \
+      -g genes.bed \
+      -i intrones_padded.bed \
+      -r hg38 \
+      -n gnomad.genomes.vcf.gz \
+      -m 0.0001 -t 8 -o Filtrado_Genes_CMT1234
+
+## Pasos para realizar anotación 1
+
 Crear directorio con cache vep
 ```sh
 mkdir -p /ruta/vep_cache
@@ -103,23 +116,7 @@ cd /ruta/vep_cache
 wget https://ftp.ensembl.org/pub/release-113/variation/indexed_vep_cache/homo_sapiens_vep_113_GRCh38.tar.gz
 tar -xzf homo_sapiens_vep_113_GRCh38.tar.gz
 ```
-Crear entorno conda para ejecutar el script
-```sh
-conda create -n filtrado
-```
-Para realizar el filtrado ejecutar:
-```sh
-./F_pipeline_filtrado_v3.sh
--s paciente01 \
-      -v paciente01.raw.vcf.gz \
-      -g genes.bed \
-      -i intrones_padded.bed \
-      -r GRCh38.fasta \
-      -c /ruta/.vep \
-      -n gnomad.genomes.vcf.gz \
-      -x spliceai_scores.raw.snv.hg38.vcf.gz \
-      -y spliceai_scores.raw.indel.hg38.vcf.gz \
-      -m 0.01 -t 8 -o resultados_paciente01
+
 ```
 Para crear un tsv a partir del vfc generado
 ```
