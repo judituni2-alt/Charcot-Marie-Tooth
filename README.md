@@ -107,7 +107,7 @@ Para realizar el filtrado ejecutar:
       -n gnomad.genomes.vcf.gz \
       -m 0.0001 -t 8 -o Filtrado_Genes_CMT1234
 ```
-## Pasos para realizar anotación 1
+## Pasos para realizar Anotación 1
 
 Crear directorio con cache vep
 ```sh
@@ -115,6 +115,14 @@ mkdir -p /ruta/vep_cache
 cd /ruta/vep_cache
 wget https://ftp.ensembl.org/pub/release-113/variation/indexed_vep_cache/homo_sapiens_vep_113_GRCh38.tar.gz
 tar -xzf homo_sapiens_vep_113_GRCh38.tar.gz
+```
+Crear entorno conda para ejecutar el script
+```sh
+conda create -n Anotacion1 -c conda-forge -c bioconda ensembl-vep=113 bcftools
+```
+Ejecutar
+```sh
+F_Anotacion1.sh -v CMT1234.intronicas.maf_filtered.vcf.gz -r hg38_v0_Homo_sapiens_assembly38.fasta -c vep_cache/ -x spliceai_scores.raw.snv.hg38.vcf.gz -y spliceai_scores.raw.indel.hg38.vcf.gz -o Anotacion1_HMSN_CMT1234 -s CMT1234
 ```
 
 Para crear un tsv a partir del vfc generado
