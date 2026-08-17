@@ -118,7 +118,7 @@ tar -xzf homo_sapiens_vep_113_GRCh38.tar.gz
 ```
 Crear entorno conda para ejecutar el script
 ```sh
-conda create -n Anotacion1 -c conda-forge -c bioconda ensembl-vep=113 bcftools
+conda create -n Anotacion1 -c conda-forge -c bioconda ensembl-vep=113 bcftools python
 ```
 Ejecutar
 ```sh
