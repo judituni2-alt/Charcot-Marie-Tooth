@@ -1,4 +1,6 @@
 # PIPELINE VARIANTES INTRÓNICAS CHARCOT-MARIE-TOOTH
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 El pipeline sigue el siguiente flujo de trabajo
 
 Preprocesamiento
@@ -81,9 +83,9 @@ Genera un resumen del VCF crudo final del pipeline de preprocesamiento:
  - nº de SNPs vs indels
  - variantes por cromosoma
 
-## Pasos para realizar el filtrado de variantes candidatas
+## Pasos para realizar el filtrado de variantes candidatas (Filtrado 1)
 
-Archivos necesarios para el filtrado de variantes
+Archivos necesarios para el filtrado de variantes 
 - VCF con todas las variantes (ya generado)
 - Archivo BED genes de interes (en el repositorio)
 - Archivo BED genes de interés regiones intrónicas+15pb hacia el exon (en repositorio)
@@ -120,9 +122,27 @@ Para realizar el filtrado ejecutar:
       -m 0.01 -t 8 -o resultados_paciente01
 ```
 Para crear un tsv a partir del vfc generado
+```
+{
+    echo -e "CHROM\tPOS\tREF\tALT\tAllele\tConsequence\tIMPACT\tSYMBOL\tGene\tFeature_type\tFeature\tBIOTYPE\tEXON\tINTRON\tHGVSc\tHGVSp\tcDNA_position\tCDS_position\tProtein_position\tAmino_acids\tCodons\tExisting_variation\tDISTANCE\tSTRAND\tFLAGS\tSYMBOL_SOURCE\tHGNC_ID\tMANE\tMANE_SELECT\tSpliceAI_pred_DP_AG\tSpliceAI_pred_DP_AL\tSpliceAI_pred_DP_DG\tSpliceAI_pred_DP_DL\tSpliceAI_pred_DS_AG\tSpliceAI_pred_DS_AL\tSpliceAI_pred_DS_DG\tSpliceAI_pred_DS_DL\tSpliceAI_pred_SYMBOL"
 
-
-
-
-
+bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%INFO/CSQ\n' input.vcf.gz |
+awk -F'\t' 'BEGIN {OFS="\t"} {
+    n=split($5,a,"|")
+    printf "%s\t%s\t%s\t%s", $1,$2,$3,$4
+    for(i=1;i<=n;i++)
+        printf "\t%s",a[i]
+    printf "\n"
+}'
+} > output.tsv
+```
+Para filtrar el archivo tsv de manera que se genere otro con variantes que tengan algún valor SpliceAI_pred_DS>0.2
+```
+python -c "import pandas as pd; df=pd.read_csv('CMT1234.intronicas.spliceai.tsv', sep='\t'); cols=['SpliceAI_pred_DS_AG','SpliceAI_pred_DS_AL','SpliceAI_pred_DS_DG','SpliceAI_pred_DS_DL']; df[cols]=df[cols].apply(pd.to_numeric, errors='coerce'); df[df[cols].max(axis=1)>0.2].to_csv('CMT1234.intronicas.spliceai.tsv', sep='\t', index=False)"
+```
+Para convertir el tsv generado en un csv
+```
+python -c "import pandas as pd; pd.read_csv('input.tsv', sep='\t').to_csv('output.csv', index=False)"
+```
+## Pasos para realizar el filtrado de variantes candidatas (Filtrado 2)
 
