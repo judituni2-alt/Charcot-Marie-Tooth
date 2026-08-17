@@ -4,9 +4,9 @@
 
 
 # ---------------------------------------------------------------------------
-# 4. ANOTACIÓN VEP + SpliceAI (solo anotación: la separación intrón/exón ya
-#    se hizo por BED en el paso 2, aquí VEP no filtra nada)
-#    Sin filtro de sinónimas: no aplica a variantes intrónicas.
+# ANOTACIÓN VEP + SpliceAI (solo anotación: la separación intrón/exón ya
+# se hizo por BED en el paso 2, aquí VEP no filtra nada)
+# Sin filtro de sinónimas: no aplica a variantes intrónicas.
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
@@ -14,7 +14,7 @@ set -euo pipefail
 # ---------------------------- 0. CONFIGURACIÓN ------------------------------
 
 
-VCF_MAF=""          # VCF con variantes filtradas por MAF
+VCF_MAF=""          # VCF con variantes filtradas por MAF y Genes de interés
 VEP_CACHE_DIR=""    # Directorio con caché vep
 REF_GENOME=""       # Genoma de referencia
 THREADS=8            # Hilos de procesador utilizados: 8 por defecto
@@ -24,14 +24,14 @@ OUTDIR=""            # Directorio de salida
 
 
 # -------------------------- Asignación de valores a variables mediante flags ------------------------------
-while getopts ":s:v:g:i:r:c:n:x:y:m:t:o:h" opt; do
+while getopts "s:v:r:c:x:y:t:o:h" opt; do
     case "$opt" in
+        s) SAMPLE_ID="$OPTARG" ;;
         v) VCF_MAF="$OPTARG" ;;
         r) REF_GENOME="$OPTARG" ;;
         c) VEP_CACHE_DIR="$OPTARG" ;;
         x) SPLICEAI_SNV="$OPTARG" ;;
         y) SPLICEAI_INDEL="$OPTARG" ;;
-        m) MAF_THRESHOLD="$OPTARG" ;;
         t) THREADS="$OPTARG" ;;
         o) OUTDIR="$OPTARG" ;;
         h) mostrar_ayuda; exit 0 ;;
@@ -40,6 +40,15 @@ while getopts ":s:v:g:i:r:c:n:x:y:m:t:o:h" opt; do
     esac
 done
 
+
+# -------------------- Crear directorio y subsirectorios específicos para la muestra ---------------------
+
+mkdir -p "$OUTDIR"/{logs,vep_spliceai}
+
+# ---------------------------- Creación de la función log ------------------------------
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+
+VCF_FINAL="$OUTDIR/vep_spliceai/${SAMPLE_ID}.intronicas.spliceai.vcf.gz"
 
 log "Anotando con VEP (MANE Select) + SpliceAI"
 vep --input_file "$VCF_MAF" \
