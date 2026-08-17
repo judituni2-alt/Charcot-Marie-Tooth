@@ -146,6 +146,7 @@ python -c "import pandas as pd; df=pd.read_csv('CMT1234.intronicas.spliceai.tsv'
 ```
 Para convertir el tsv generado en un csv
 
+```
 python -c "import pandas as pd; pd.read_csv('input.tsv', sep='\t').to_csv('output.csv', index=False)"
 ```
 ## Pasos para realizar el filtrado de variantes candidatas (Filtrado 2)
