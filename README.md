@@ -106,7 +106,7 @@ Para realizar el filtrado ejecutar:
       -r hg38 \
       -n gnomad.genomes.vcf.gz \
       -m 0.0001 -t 8 -o Filtrado_Genes_CMT1234
-
+```
 ## Pasos para realizar anotación 1
 
 Crear directorio con cache vep
@@ -117,7 +117,6 @@ wget https://ftp.ensembl.org/pub/release-113/variation/indexed_vep_cache/homo_sa
 tar -xzf homo_sapiens_vep_113_GRCh38.tar.gz
 ```
 
-```
 Para crear un tsv a partir del vfc generado
 ```
 {
@@ -138,7 +137,7 @@ Para filtrar el archivo tsv de manera que se genere otro con variantes que tenga
 python -c "import pandas as pd; df=pd.read_csv('CMT1234.intronicas.spliceai.tsv', sep='\t'); cols=['SpliceAI_pred_DS_AG','SpliceAI_pred_DS_AL','SpliceAI_pred_DS_DG','SpliceAI_pred_DS_DL']; df[cols]=df[cols].apply(pd.to_numeric, errors='coerce'); df[df[cols].max(axis=1)>0.2].to_csv('CMT1234.intronicas.spliceai.tsv', sep='\t', index=False)"
 ```
 Para convertir el tsv generado en un csv
-```
+
 python -c "import pandas as pd; pd.read_csv('input.tsv', sep='\t').to_csv('output.csv', index=False)"
 ```
 ## Pasos para realizar el filtrado de variantes candidatas (Filtrado 2)
