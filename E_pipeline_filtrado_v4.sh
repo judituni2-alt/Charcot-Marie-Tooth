@@ -127,7 +127,7 @@ bcftools annotate \
 
 tabix -f -p vcf "$VCF_MAF_ANOT"
 
-log "Paso 3/3 Filtrando variantes con MAF < ${MAF_THRESHOLD}..."
+log "Paso 3/3 Filtrando variantes con MAF < ${MAF_THRESHOLD} o con MAF desconocido (.)..."
 
 bcftools view \
     -i "INFO/AF<${MAF_THRESHOLD} || INFO/AF='.'" \
