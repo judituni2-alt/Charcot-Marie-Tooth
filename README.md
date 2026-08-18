@@ -122,7 +122,7 @@ conda create -n Anotacion1 -c conda-forge -c bioconda ensembl-vep=113 python=3.1
 ```
 Ejecutar
 ```sh
-F_Anotacion1.sh -v CMT1234.intronicas.maf_filtered.vcf.gz -r hg38_v0_Homo_sapiens_assembly38.fasta -c vep_cache/ -x spliceai_scores.raw.snv.hg38.vcf.gz -y spliceai_scores.raw.indel.hg38.vcf.gz -o Anotacion1_HMSN_CMT1234 -s CMT1234
+./F_Anotacion1.sh -v CMT1234.intronicas.maf_filtered.vcf.gz -r hg38_v0_Homo_sapiens_assembly38.fasta -c vep_cache/ -x spliceai_scores.raw.snv.hg38.vcf.gz -y spliceai_scores.raw.indel.hg38.vcf.gz -o Anotacion1_HMSN_CMT1234 -s CMT1234
 ```
 
 Para crear un tsv a partir del vfc generado
