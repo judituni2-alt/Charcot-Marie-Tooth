@@ -109,6 +109,9 @@ Para realizar el filtrado ejecutar:
 ```
 ## Pasos para realizar Anotación 1
 
+Archivos necesarios para la anotación
+- VCF con todas las variantes filtradas por genes y MAF (ya generado)
+
 Crear directorio con cache vep
 ```sh
 mkdir -p /ruta/vep_cache
@@ -151,3 +154,6 @@ python -c "import pandas as pd; pd.read_csv('input.tsv', sep='\t').to_csv('outpu
 ```
 ## Pasos para realizar el filtrado de variantes candidatas (Filtrado 2)
 
+Listado de archivos necesarios  
+- Directorio cache de VEP
+- VCF con todas las variantes filtradas por genes y MAF (ya generado)
