@@ -185,7 +185,7 @@ vep --cache --offline --dir_cache ./Ref/.vep --cache_version 113 --assembly GRCh
 
 ## Adicional
 
-Para crear un tsv a partir del vfc generado
+Para crear un tsv a partir del vfc generado en anotacion1
 ```
 {
     echo -e "CHROM\tPOS\tREF\tALT\tAllele\tConsequence\tIMPACT\tSYMBOL\tGene\tFeature_type\tFeature\tBIOTYPE\tEXON\tINTRON\tHGVSc\tHGVSp\tcDNA_position\tCDS_position\tProtein_position\tAmino_acids\tCodons\tExisting_variation\tDISTANCE\tSTRAND\tFLAGS\tSYMBOL_SOURCE\tHGNC_ID\tMANE\tMANE_SELECT\tSpliceAI_pred_DP_AG\tSpliceAI_pred_DP_AL\tSpliceAI_pred_DP_DG\tSpliceAI_pred_DP_DL\tSpliceAI_pred_DS_AG\tSpliceAI_pred_DS_AL\tSpliceAI_pred_DS_DG\tSpliceAI_pred_DS_DL\tSpliceAI_pred_SYMBOL"
@@ -208,4 +208,18 @@ Para convertir el tsv generado en un csv
 
 ```
 python -c "import pandas as pd; pd.read_csv('input.tsv', sep='\t').to_csv('output.csv', index=False)"
+```
+Para crear un tsv a partir del vfc generado en anotacion2 (anotacionces de MaxEntScan y ConSplice)
+```
+ {     echo -e "CHROM\tPOS\tREF\tALT\tAllele\tConsequence\tIMPACT\tSYMBOL\tGene\tFeature_type\tFeature\tBIOTYPE\tEXON\tINTRON\tHGVSc\tHGVSp\tcDNA_position\tCDS_position\tProtein_position\tAmino_acids\tCodons\tExisting_variation\tDISTANCE\tSTRAND\tFLAGS\tSYMBOL_SOURCE\tHGNC_ID\tSOURCE\tHGVS_OFFSET\tMES-NCSS_downstream_acceptor\tMES-NCSS_downstream_donor\tMES-NCSS_upstream_acceptor\tMES-NCSS_upstream_donor\tMES-SWA_acceptor_alt\tMES-SWA_acceptor_diff\tMES-SWA_acceptor_ref\tMES-SWA_acceptor_ref_comp\tMES-SWA_donor_alt\tMES-SWA_donor_diff\tMES-SWA_donor_ref\tMES-SWA_donor_ref_comp\tMaxEntScan_alt\tMaxEntScan_diff\tMaxEntScan_ref\tConSplice";      bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%INFO/CSQ\n' NeurMUS1409.anotacionPDIVASvep.vcf |     awk -F'\t' 'BEGIN {OFS="\t"}
+    {
+        n=split($5, annotations, ",")
+        for (k=1; k<=n; k++) {
+            m=split(annotations[k], a, "|")
+            printf "%s\t%s\t%s\t%s", $1, $2, $3, $4
+            for (i=1; i<=m; i++)
+                printf "\t%s", a[i]
+            printf "\n"
+        }
+    }'; } > Neur_MUS1409_anotation2_CSQ.tsv
 ```
