@@ -128,6 +128,63 @@ Ejecutar
 ./F_Anotacion1.sh -v CMT1234.intronicas.maf_filtered.vcf.gz -r hg38_v0_Homo_sapiens_assembly38.fasta -c vep_cache/ -x spliceai_scores.raw.snv.hg38.vcf.gz -y spliceai_scores.raw.indel.hg38.vcf.gz -o Anotacion1_HMSN_CMT1234 -s CMT1234
 ```
 
+## Pasos para realizar el filtrado de variantes candidatas (Filtrado 2)
+Pipeline extraído y modificado del repositorio https://github.com/shiro-kur/PDIVAS.git
+
+Listado de archivos necesarios  
+- Directorio cache de VEP
+- VCF con todas las variantes filtradas por genes y MAF (ya generado)
+
+Crear ambientes necesarios
+
+```
+conda create -n PDIVAS_spliceai -c bioconda -c conda-forge spliceai tensorflow==2.6.2 pdivas bcftools vcfanno
+conda create -n PDIVAS_VEP -c conda-forge -c bioconda perl ensembl-vep=113
+conda create -n PDIVAS_predict -c bioconda -c conda-forge spliceai pdivas bcftools vcfanno
+```
+Para SpliceAI personalizado para salida en el entorno conda de PDIVAS
+
+```sh
+git clone https://github.com/shiro-kur/SpliceAI.git
+cp -r SpliceAI/spliceai/* ~/miniconda3/envs/PDIVAS/lib/python3.9/site-packages/spliceai/
+```
+
+Para uso personalizado de VEP:
+```
+# Download VEP cache files
+$ mkdir -p ~/Ref/.vep
+$ cd ~/Ref/.vep
+$ wget https://ftp.ensembl.org/pub/release-113/variation/vep/homo_sapiens_vep_113_GRCh38.tar.gz
+$ tar xzf homo_sapiens_vep_113_GRCh38.tar.gz
+
+#Setting MaxEntScan
+$ mkdir -p ~/Ref/.vep/Plugin/MaxEntScan
+$ cd ~/Ref/.vep/Plugin/MaxEntScan
+$ wget http://hollywood.mit.edu/burgelab/maxent/download/fordownload.tar.gz
+$ tar xzf fordownload.tar.gz
+
+#Setting ConSplice
+$ cd ~/Ref/.vep
+$ wget https://storage.googleapis.com/pdivas/ConSplice_for_PDIVAS/ConSplice.50bp_region.inverse_proportion_refo_hg38.bed.gz
+$ tabix -f ConSplice.50bp_region.inverse_proportion_refo_hg38.bed.gz
+```
+Nota del autor: The ConSplice file was edited from the originally scored file by ([Cormier et al., BMC Bioinformatics 2022](https://home.chpc.utah.edu/~u1138933/ConSplice/best_splicing_constraint_model/)).
+
+Preprocesando el formato VCF (resolviendo los sitios multialélicos en sitios bialélicos)
+
+```sh
+conda activate PDIVAS_spliceai
+bcftools norm -m - multi.vcf > bi.vcf
+```
+
+Agrega anotaciones de genes, puntuaciones de MaxEntScan y puntuaciones de ConSplice con VEP.
+```sh
+conda activate VEP
+vep --cache --offline --dir_cache ./Ref/.vep --cache_version 113 --assembly GRCh38 --hgvs --pick_allele_gene --fasta hg38_v0_Homo_sapiens_assembly38.fasta --vcf --force --custom ./Ref/.vep/ConSplice.50bp_region.inverse_proportion_refo_hg38.bed.gz,ConSplice,bed,overlap,0 --plugin MaxEntScan,./Ref/.vep/Plugin/MaxEntScan,SWA,NCSS --compress_output bgzip -i CMT1234.intronicas.bi.vcf.gz -o CMT1234.anotacionPDIVAS.vcf
+```
+
+## Adicional
+
 Para crear un tsv a partir del vfc generado
 ```
 {
@@ -152,8 +209,3 @@ Para convertir el tsv generado en un csv
 ```
 python -c "import pandas as pd; pd.read_csv('input.tsv', sep='\t').to_csv('output.csv', index=False)"
 ```
-## Pasos para realizar el filtrado de variantes candidatas (Filtrado 2)
-
-Listado de archivos necesarios  
-- Directorio cache de VEP
-- VCF con todas las variantes filtradas por genes y MAF (ya generado)
