@@ -58,6 +58,7 @@ vep --input_file "$VCF_MAF" \
     --fasta "$REF_GENOME" \
     --fork "$THREADS" \
     --mane_select \
+    --hgvs \
     --pick --pick_order mane_select,canonical,rank \
     --plugin SpliceAI,snv="$SPLICEAI_SNV",indel="$SPLICEAI_INDEL" \
     2> "$OUTDIR/logs/04_vep_spliceai.log" \
