@@ -170,18 +170,31 @@ $ tabix -f ConSplice.50bp_region.inverse_proportion_refo_hg38.bed.gz
 ```
 Nota del autor: The ConSplice file was edited from the originally scored file by ([Cormier et al., BMC Bioinformatics 2022](https://home.chpc.utah.edu/~u1138933/ConSplice/best_splicing_constraint_model/)).
 
-Preprocesando el formato VCF (resolviendo los sitios multialélicos en sitios bialélicos)
+1_Preprocesando el formato VCF (resolviendo los sitios multialélicos en sitios bialélicos)
 
 ```sh
 conda activate PDIVAS_spliceai
 bcftools norm -m - multi.vcf > bi.vcf
 ```
 
-Agrega anotaciones de genes, puntuaciones de MaxEntScan y puntuaciones de ConSplice con VEP.
+2_Agrega anotaciones de genes, puntuaciones de MaxEntScan y puntuaciones de ConSplice con VEP.
 ```sh
 conda activate VEP
 vep --cache --offline --dir_cache ./Ref/.vep --cache_version 113 --assembly GRCh38 --hgvs --pick_allele_gene --fasta hg38_v0_Homo_sapiens_assembly38.fasta --vcf --force --custom ./Ref/.vep/ConSplice.50bp_region.inverse_proportion_refo_hg38.bed.gz,ConSplice,bed,overlap,0 --plugin MaxEntScan,./Ref/.vep/Plugin/MaxEntScan,SWA,NCSS --compress_output bgzip -i CMT1234.intronicas.bi.vcf.gz -o CMT1234.anotacionPDIVAS.vcf
 ```
+
+3_Add output-customized SpliceAI scores
+```sh
+conda activate PDIVAS
+spliceai -I examples/ex_vep.vcf.gz -O examples/ex_vep_AI.vcf -R hg38.fa -A grch38 -D 300 -M 1
+```
+
+4_Perform the detection of deep-intronic variants and PDIVAS prediction
+```sh
+pdivas predict -I examples/ex_vep_AI.vcf -O examples/ex_vep_AI_PD.vcf.gz -F off
+```
+
+
 
 ## Adicional
 
