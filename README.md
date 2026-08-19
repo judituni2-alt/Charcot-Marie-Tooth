@@ -182,6 +182,10 @@ bcftools norm -m - multi.vcf > bi.vcf
 conda activate VEP
 vep --cache --offline --dir_cache ./Ref/.vep --cache_version 113 --assembly GRCh38 --hgvs --pick_allele_gene --fasta hg38_v0_Homo_sapiens_assembly38.fasta --vcf --force --custom ./Ref/.vep/ConSplice.50bp_region.inverse_proportion_refo_hg38.bed.gz,ConSplice,bed,overlap,0 --plugin MaxEntScan,./Ref/.vep/Plugin/MaxEntScan,SWA,NCSS --compress_output bgzip -i CMT1234.intronicas.bi.vcf.gz -o CMT1234.anotacionPDIVAS.vcf
 ```
+2.1_Generar índice con tabix
+```sh
+tabix -p vcf CMT1234_vep_maxs_cns.vcf
+```
 
 3_Add output-customized SpliceAI scores
 ```sh
