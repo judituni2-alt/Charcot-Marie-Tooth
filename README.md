@@ -98,8 +98,7 @@ conda create -n Filtrado -c conda-forge -c bioconda bcftools bedtools tabix
 ```
 Para realizar el filtrado ejecutar:
 ```sh
-./E_pipeline_filtrado_v4.sh
--s paciente01 \
+./E_pipeline_filtrado_v4.sh -s CMT1234 \
       -v CMT1234.raw.vcf.gz \
       -g genes.bed \
       -i intrones_padded.bed \
