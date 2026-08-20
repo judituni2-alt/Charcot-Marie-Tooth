@@ -239,3 +239,41 @@ Para crear un tsv a partir del vfc generado en anotacion2 (anotacionces de MaxEn
         }
     }'; } > Neur_MUS1409_anotation2_CSQ.tsv
 ```
+```
+{
+    echo -e "CHROM\tPOS\tREF\tALT\tINDEL\tIDV\tIMF\tINFO_DP\tVDB\tRPBZ\tMQBZ\tBQBZ\tMQSBZ\tSCBZ\tSGB\tMQ0F\tAC\tAN\tDP4\tMQ\tAF\tINFO_ConSplice\tSpliceAI\tPDIVAS\tAllele\tConsequence\tIMPACT\tSYMBOL\tGene\tFeature_type\tFeature\tBIOTYPE\tEXON\tINTRON\tHGVSc\tHGVSp\tcDNA_position\tCDS_position\tProtein_position\tAmino_acids\tCodons\tExisting_variation\tDISTANCE\tSTRAND\tFLAGS\tSYMBOL_SOURCE\tHGNC_ID\tSOURCE\tHGVS_OFFSET\tMES-NCSS_downstream_acceptor\tMES-NCSS_downstream_donor\tMES-NCSS_upstream_acceptor\tMES-NCSS_upstream_donor\tMES-SWA_acceptor_alt\tMES-SWA_acceptor_diff\tMES-SWA_acceptor_ref\tMES-SWA_acceptor_ref_comp\tMES-SWA_donor_alt\tMES-SWA_donor_diff\tMES-SWA_donor_ref\tMES-SWA_donor_ref_comp\tMaxEntScan_alt\tMaxEntScan_diff\tMaxEntScan_ref\tCSQ_ConSplice"
+
+    bcftools query -f \
+'%CHROM\t%POS\t%REF\t%ALT\t%INFO/INDEL\t%INFO/IDV\t%INFO/IMF\t%INFO/DP\t%INFO/VDB\t%INFO/RPBZ\t%INFO/MQBZ\t%INFO/BQBZ\t%INFO/MQSBZ\t%INFO/SCBZ\t%INFO/SGB\t%INFO/MQ0F\t%INFO/AC\t%INFO/AN\t%INFO/DP4\t%INFO/MQ\t%INFO/AF\t%INFO/ConSplice\t%INFO/SpliceAI\t%INFO/PDIVAS\t%INFO/CSQ\n' \
+NeurMUS1409.anotacionPDIVASvep.vcf |
+    awk -F'\t' '
+    BEGIN {
+        OFS = "\t"
+    }
+    {
+        # CSQ está en la columna 25
+        n = split($25, annotations, ",")
+
+        for (k = 1; k <= n; k++) {
+            # Separa los 41 subcampos de cada anotación CSQ
+            split(annotations[k], csq, "|")
+
+            # Imprime CHROM-ALT y los 20 campos INFO anteriores a CSQ
+            printf "%s", $1
+            for (i = 2; i <= 24; i++)
+                printf OFS "%s", $i
+
+            # Imprime siempre los 41 campos esperados de CSQ
+            for (i = 1; i <= 41; i++) {
+                value = (i in csq && csq[i] != "") ? csq[i] : "."
+                printf OFS "%s", value
+            }
+
+            printf "\n"
+
+            delete csq
+        }
+    }'
+} > Neur_MUS1409_anotation2_completa.tsv
+```
+
